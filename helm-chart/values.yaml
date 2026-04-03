@@ -1,0 +1,60 @@
+backend:
+  image: ghcr.io/kakarot-dev/mirofish-backend:latest
+  port: 5001
+  resources:
+    requests:
+      memory: "1.5Gi"
+      cpu: "1000m"
+    limits:
+      memory: "2Gi"
+      cpu: "1500m"
+
+mcp:
+  image: ghcr.io/kakarot-dev/mirofish-mcp:latest
+  port: 3001
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+neo4j:
+  image: neo4j:5.15-community
+  boltPort: 7687
+  httpPort: 7474
+  heap: "3G"
+  pagecache: "1G"
+  storage: 50Gi
+  resources:
+    requests:
+      memory: "3Gi"
+      cpu: "1500m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+
+redis:
+  image: redis:7-alpine
+  port: 6379
+  storage: 5Gi
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+ingress:
+  enabled: true
+  host: mirofishmcp.tech
+  className: traefik
+
+llm:
+  baseUrl: "https://api.fireworks.ai/inference/v1"
+  modelName: "accounts/fireworks/models/qwen3-8b"
+
+uploads:
+  storage: 20Gi

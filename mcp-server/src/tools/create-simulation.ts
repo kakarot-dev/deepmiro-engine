@@ -1,0 +1,85 @@
+import { z } from "zod";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { MirofishClient } from "../client/mirofish-client.js";
+import { toMcpError } from "../errors/index.js";
+
+const inputSchema = {
+  prompt: z
+    .string()
+    .min(10)
+    .describe("Scenario description. E.g. 'How will crypto twitter react to a new ETH ETF rejection?'"),
+  files: z
+    .array(
+      z.object({
+        name: z.string().describe("Filename (e.g. report.pdf)"),
+        content_base64: z.string().describe("Base64-encoded file content"),
+        mime_type: z.string().describe("MIME type (e.g. application/pdf)"),
+      }),
+    )
+    .optional()
+    .describe("Optional documents to seed the knowledge graph"),
+  preset: z
+    .enum(["quick", "standard", "deep"])
+    .optional()
+    .describe("Simulation preset: quick (10 agents, 20 rounds), standard (20/40), deep (50/72)"),
+  agent_count: z.number().int().min(2).max(500).optional().describe("Override agent count"),
+  rounds: z.number().int().min(1).max(100).optional().describe("Override simulation rounds"),
+  platform: z
+    .enum(["twitter", "reddit", "both"])
+    .optional()
+    .describe("Target platform(s). Default: both"),
+};
+
+export function registerCreateSimulation(server: McpServer, client: MirofishClient): void {
+  server.registerTool(
+    "create_simulation",
+    {
+      title: "Create Simulation",
+      description:
+        "Launch a MiroFish swarm simulation. Builds a knowledge graph from the prompt/files, " +
+        "generates agent personas, and runs a multi-agent social media simulation. " +
+        "Returns simulation ID for tracking. Long-running (1-10 minutes).",
+      inputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    async (args) => {
+      try {
+        const files = args.files?.map((f) => ({
+          name: f.name,
+          content: Buffer.from(f.content_base64, "base64"),
+          mimeType: f.mime_type,
+        }));
+
+        const sim = await client.createSimulation({
+          prompt: args.prompt,
+          files,
+          preset: args.preset,
+          agentCount: args.agent_count,
+          rounds: args.rounds,
+          platform: args.platform,
+        });
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(
+                {
+                  simulation_id: sim.simulation_id,
+                  status: sim.status,
+                  entities_count: sim.entities_count,
+                  profiles_count: sim.profiles_count,
+                  message: `Simulation started. Use simulation_status to track progress.`,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err) {
+        throw toMcpError(err);
+      }
+    },
+  );
+}

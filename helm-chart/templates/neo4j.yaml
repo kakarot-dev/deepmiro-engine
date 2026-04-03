@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "mirofish.fullname" . }}-neo4j
+  labels:
+    {{- include "mirofish.labels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: {{ .Values.neo4j.storage }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "mirofish.fullname" . }}-neo4j
+  labels:
+    {{- include "mirofish.labels" . | nindent 4 }}
+    component: neo4j
+spec:
+  serviceName: {{ include "mirofish.fullname" . }}-neo4j
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      component: neo4j
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        component: neo4j
+    spec:
+      containers:
+      - name: neo4j
+        image: {{ .Values.neo4j.image }}
+        ports:
+        - containerPort: {{ .Values.neo4j.boltPort }}
+          name: bolt
+        - containerPort: {{ .Values.neo4j.httpPort }}
+          name: http
+        env:
+        - name: NEO4J_AUTH
+          value: "neo4j/$(NEO4J_PASSWORD)"
+        - name: NEO4J_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "mirofish.fullname" . }}-secrets
+              key: neo4j-password
+        - name: NEO4J_PLUGINS
+          value: '["apoc"]'
+        - name: NEO4J_dbms_memory_heap_max__size
+          value: {{ .Values.neo4j.heap | quote }}
+        - name: NEO4J_dbms_memory_pagecache_size
+          value: {{ .Values.neo4j.pagecache | quote }}
+        resources:
+          {{- toYaml .Values.neo4j.resources | nindent 10 }}
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: {{ include "mirofish.fullname" . }}-neo4j
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mirofish.fullname" . }}-neo4j
+  labels:
+    {{- include "mirofish.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    component: neo4j
+  ports:
+  - name: bolt
+    port: {{ .Values.neo4j.boltPort }}
+  - name: http
+    port: {{ .Values.neo4j.httpPort }}

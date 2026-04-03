@@ -1,0 +1,25 @@
+import { z } from "zod";
+import type { MirofishConfig } from "./types/index.js";
+
+const envSchema = z.object({
+  MIROFISH_URL: z.string().url().default("http://localhost:5001"),
+  LLM_API_KEY: z.string().min(1, "LLM_API_KEY is required"),
+  MCP_API_KEY: z.string().optional(),
+  TRANSPORT: z.enum(["stdio", "http"]).default("stdio"),
+  HTTP_PORT: z.coerce.number().int().min(1).max(65535).default(3001),
+  REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
+  MAX_RETRIES: z.coerce.number().int().min(0).max(10).default(3),
+});
+
+export function loadConfig(): MirofishConfig {
+  const parsed = envSchema.parse(process.env);
+  return {
+    mirofishUrl: parsed.MIROFISH_URL,
+    llmApiKey: parsed.LLM_API_KEY,
+    mcpApiKey: parsed.MCP_API_KEY,
+    transport: parsed.TRANSPORT,
+    httpPort: parsed.HTTP_PORT,
+    requestTimeoutMs: parsed.REQUEST_TIMEOUT_MS,
+    maxRetries: parsed.MAX_RETRIES,
+  };
+}
