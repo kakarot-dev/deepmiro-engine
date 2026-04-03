@@ -66,7 +66,7 @@ This starts:
 
 ## Hosted Service
 
-Coming soon at [mirofishmcp.tech](https://mirofishmcp.tech).
+Coming soon at [deepmiro.org](https://deepmiro.org).
 
 No setup required — just add the MCP server URL to your Claude config.
 

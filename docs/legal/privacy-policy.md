@@ -3,7 +3,7 @@
 **Effective Date:** April 3, 2026
 **Last Updated:** April 3, 2026
 
-This Privacy Policy describes how Joel Libni ("we", "us", "the Operator"), operating mirofishmcp.tech ("the Service"), collects, uses, and protects your personal information.
+This Privacy Policy describes how Joel Libni ("we", "us", "the Operator"), operating deepmiro.org ("the Service"), collects, uses, and protects your personal information.
 
 ---
 

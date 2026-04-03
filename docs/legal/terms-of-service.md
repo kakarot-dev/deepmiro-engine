@@ -3,7 +3,7 @@
 **Effective Date:** April 3, 2026
 **Last Updated:** April 3, 2026
 
-These Terms of Service ("Terms") govern your use of DeepMiro ("the Service"), operated at mirofishmcp.tech by Joel Libni ("we", "us", "the Operator").
+These Terms of Service ("Terms") govern your use of DeepMiro ("the Service"), operated at deepmiro.org by Joel Libni ("we", "us", "the Operator").
 
 By accessing or using the Service, you agree to these Terms. If you do not agree, do not use the Service.
 
@@ -14,7 +14,7 @@ By accessing or using the Service, you agree to these Terms. If you do not agree
 DeepMiro is an MCP (Model Context Protocol) server that provides AI-powered swarm prediction simulations. It wraps the open-source MiroFish engine and exposes it as a set of tools for Claude Code, Claude Desktop, and other MCP-compatible clients.
 
 The Service is available as:
-- **Hosted** — a managed service at mirofishmcp.tech
+- **Hosted** — a managed service at deepmiro.org
 - **Self-hosted** — open-source software you run on your own infrastructure
 
 These Terms apply to the **hosted service**. Self-hosted use is governed by the AGPL-3.0 license.
@@ -106,7 +106,7 @@ DeepMiro is licensed under **AGPL-3.0**. The source code is available at [github
 This means:
 - You may self-host the software for free.
 - If you modify and distribute the software, or offer it as a network service, you must release your modifications under AGPL-3.0.
-- The hosted service at mirofishmcp.tech includes the same AGPL-3.0 code plus operational infrastructure (hosting, auth, billing) that is not part of the licensed software.
+- The hosted service at deepmiro.org includes the same AGPL-3.0 code plus operational infrastructure (hosting, auth, billing) that is not part of the licensed software.
 
 ---
 

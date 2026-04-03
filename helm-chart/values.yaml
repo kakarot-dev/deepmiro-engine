@@ -34,7 +34,7 @@ surrealdb:
 
 ingress:
   enabled: true
-  host: mirofishmcp.tech
+  host: deepmiro.org
   className: traefik
 
 llm:

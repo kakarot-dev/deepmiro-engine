@@ -3,7 +3,7 @@
 **Effective Date:** April 3, 2026
 **Last Updated:** April 3, 2026
 
-This Acceptable Use Policy ("AUP") governs your use of DeepMiro ("the Service"), operated at mirofishmcp.tech by Joel Libni. This AUP is part of our [Terms of Service](/docs/legal/terms-of-service).
+This Acceptable Use Policy ("AUP") governs your use of DeepMiro ("the Service"), operated at deepmiro.org by Joel Libni. This AUP is part of our [Terms of Service](/docs/legal/terms-of-service).
 
 ---
 

@@ -3,7 +3,7 @@
 **Effective Date:** April 3, 2026
 **Last Updated:** April 3, 2026
 
-This Cookie Policy explains how mirofishmcp.tech ("the Service"), operated by Joel Libni, uses cookies and similar technologies.
+This Cookie Policy explains how deepmiro.org ("the Service"), operated by Joel Libni, uses cookies and similar technologies.
 
 ---
 
@@ -53,7 +53,7 @@ If you visit our billing/checkout pages, LemonSqueezy may set cookies for paymen
 
 ## 5. MCP Client Usage
 
-If you use the Service through an MCP client (Claude Code, Claude Desktop, or similar), no cookies are involved. The MCP protocol communicates via stdio or SSE, authenticated by API key. This Cookie Policy applies only to the web dashboard at mirofishmcp.tech.
+If you use the Service through an MCP client (Claude Code, Claude Desktop, or similar), no cookies are involved. The MCP protocol communicates via stdio or SSE, authenticated by API key. This Cookie Policy applies only to the web dashboard at deepmiro.org.
 
 ---
 
