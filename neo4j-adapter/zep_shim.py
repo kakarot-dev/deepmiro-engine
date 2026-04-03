@@ -83,9 +83,19 @@ class EpisodeOpsShim:
 # ---------------------------------------------------------------------------
 
 class DictAsObject:
-    """Wraps a dict so it can be accessed with attribute syntax (obj.name) or dict syntax (obj['name'])."""
+    """Wraps a dict so it can be accessed with attribute syntax (obj.name) or dict syntax (obj['name']).
+    Also maps Zep-style field names: uuid → uuid_, labels → labels, etc."""
     def __init__(self, data: Dict[str, Any]):
-        self.__dict__.update(data)
+        # Map Neo4j field names to Zep-compatible names
+        mapped = {}
+        for k, v in data.items():
+            mapped[k] = v
+        # Ensure uuid_ exists (Zep uses uuid_, Neo4j uses uuid)
+        if "uuid" in mapped and "uuid_" not in mapped:
+            mapped["uuid_"] = mapped["uuid"]
+        if "uuid_" in mapped and "uuid" not in mapped:
+            mapped["uuid"] = mapped["uuid_"]
+        self.__dict__.update(mapped)
     def __getitem__(self, key):
         return self.__dict__[key]
     def get(self, key, default=None):
