@@ -54,11 +54,14 @@ def apply_boost_patch():
         original_chat = LLMClient.chat
 
         def patched_chat(self, messages, **kwargs):
-            # Check caller module
-            caller_frame = inspect.stack()[1]
-            caller_module = caller_frame.frame.f_globals.get("__name__", "")
-
-            use_boost = any(caller_module.startswith(m) for m in BOOST_MODULES)
+            # Check caller stack — look through multiple frames since
+            # monkey-patches add wrapper layers between caller and us
+            use_boost = False
+            for frame_info in inspect.stack()[1:6]:
+                caller_module = frame_info.frame.f_globals.get("__name__", "")
+                if any(caller_module.startswith(m) for m in BOOST_MODULES):
+                    use_boost = True
+                    break
 
             if use_boost:
                 # Swap to boost model for this call

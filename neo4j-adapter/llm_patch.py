@@ -207,23 +207,32 @@ def _merge_consecutive_roles(messages: List[Dict]) -> List[Dict]:
     return merged
 
 
-def _ensure_english_system(messages: List[Dict]) -> List[Dict]:
-    """Ensure the system prompt has English enforcement."""
+def _ensure_english(messages: List[Dict]) -> List[Dict]:
+    """Enforce English in system prompt AND last user message."""
     if not messages:
         return [{"role": "system", "content": ENGLISH_INSTRUCTION}]
 
     result = []
-    patched = False
+    patched_system = False
     for msg in messages:
         msg = msg.copy()
-        if msg["role"] == "system" and not patched:
+        if msg["role"] == "system" and not patched_system:
             if "English only" not in msg["content"] and "english only" not in msg["content"]:
                 msg["content"] = msg["content"].rstrip() + f"\n{ENGLISH_INSTRUCTION}"
-            patched = True
+            patched_system = True
         result.append(msg)
 
-    if not patched:
+    if not patched_system:
         result.insert(0, {"role": "system", "content": ENGLISH_INSTRUCTION})
+
+    # Also append to the last user message — strongest signal before generation
+    for i in range(len(result) - 1, -1, -1):
+        if result[i]["role"] == "user":
+            content = result[i]["content"]
+            if "English only" not in content:
+                result[i] = result[i].copy()
+                result[i]["content"] = content.rstrip() + "\n\n[IMPORTANT: Write your entire response in English only.]"
+            break
 
     return result
 
@@ -244,8 +253,8 @@ def patch_llm_client():
         def patched_chat(self, messages, **kwargs):
             guard = get_guard(self.model)
 
-            # 1. Enforce English
-            messages = _ensure_english_system(messages)
+            # 1. Enforce English (system + last user message)
+            messages = _ensure_english(messages)
             # 2. Model-specific preprocessing
             messages = guard.preprocess_messages(messages)
             # 3. Merge consecutive roles (all models benefit from this)
