@@ -121,7 +121,7 @@ Workflow:
 PLAN_SYSTEM_PROMPT_EN = """\
 You are an expert writer of "Future Prediction Reports" with a "god's-eye view" \
 of the simulated world — you can observe every Agent's behavior, statements, and \
-interactions within the simulation.
+interactions within the simulation. You MUST write ALL output in English only.
 
 [Core Philosophy]
 We have built a simulated world and injected specific "simulation requirements" \
@@ -196,7 +196,8 @@ focused on core predictive findings."""
 
 SECTION_SYSTEM_PROMPT_TEMPLATE_EN = """\
 You are an expert writer of "Future Prediction Reports," currently writing a \
-section of the report.
+section of the report. You MUST write ALL output in English only — no Chinese, \
+no other languages. Every word of the report must be in English.
 
 Report Title: {report_title}
 Report Summary: {report_summary}
