@@ -138,13 +138,39 @@ class GraphOpsShim:
         """Handles both Zep signatures: list of graph_ids or single graph_id."""
         ontology = {}
         if entities is not None:
-            ontology["entities"] = entities
+            ontology["entities"] = self._serialize_ontology_items(entities)
         if edges is not None:
-            ontology["edges"] = edges
+            ontology["edges"] = self._serialize_ontology_items(edges)
 
         ids = graph_ids or ([graph_id] if graph_id else [])
         for gid in ids:
             self._storage.set_ontology(gid, ontology)
+
+    @staticmethod
+    def _serialize_ontology_items(items: Any) -> Any:
+        """Convert Zep SDK model objects to JSON-serializable dicts."""
+        if isinstance(items, list):
+            return [GraphOpsShim._serialize_one(item) for item in items]
+        if isinstance(items, dict):
+            return {k: GraphOpsShim._serialize_one(v) for k, v in items.items()}
+        return GraphOpsShim._serialize_one(items)
+
+    @staticmethod
+    def _serialize_one(item: Any) -> Any:
+        """Serialize a single item — handles dataclasses, objects with __dict__, and primitives."""
+        if item is None or isinstance(item, (str, int, float, bool)):
+            return item
+        if isinstance(item, type):
+            # It's a class reference, not an instance — return its name
+            return item.__name__
+        if hasattr(item, "__dict__"):
+            return {k: GraphOpsShim._serialize_one(v) for k, v in item.__dict__.items()
+                    if not k.startswith("_")}
+        if isinstance(item, dict):
+            return {k: GraphOpsShim._serialize_one(v) for k, v in item.items()}
+        if isinstance(item, (list, tuple)):
+            return [GraphOpsShim._serialize_one(i) for i in item]
+        return str(item)
 
     def add(self, graph_id: str = "", data: str = "", type: str = "text", **kwargs) -> str:
         """Single text addition (used by zep_graph_memory_updater)."""
