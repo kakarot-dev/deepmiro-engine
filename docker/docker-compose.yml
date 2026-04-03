@@ -17,8 +17,8 @@ services:
 
   deepmiro-backend:
     build:
-      context: ../MiroFish
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile.backend
     container_name: deepmiro-backend
     environment:
       LLM_API_KEY: ${LLM_API_KEY}

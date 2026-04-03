@@ -11,25 +11,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
 
-# Clone MiroFish
-RUN git clone --depth 1 https://github.com/666ghj/MiroFish.git /app/MiroFish
+# Clone DeepMiro Engine (our fork — SurrealDB + English + LLM guards built in)
+RUN git clone --depth 1 https://github.com/kakarot-dev/deepmiro-engine.git /app/deepmiro
 
 # Install Python deps
-WORKDIR /app/MiroFish/backend
+WORKDIR /app/deepmiro/backend
 RUN uv venv .venv && \
     . .venv/bin/activate && \
     uv pip install -e . && \
-    uv pip install surrealdb neo4j
+    uv pip install surrealdb
 
-# Copy our adapters
-COPY neo4j-adapter/ /app/MiroFish/backend/neo4j_adapter/
-COPY surrealdb-adapter/ /app/MiroFish/backend/surrealdb_adapter/
-
-# Copy entry points
-COPY docker/run_surreal.py /app/MiroFish/backend/run_surreal.py
-
-WORKDIR /app/MiroFish/backend
-ENV PATH="/app/MiroFish/backend/.venv/bin:$PATH"
+WORKDIR /app/deepmiro/backend
+ENV PATH="/app/deepmiro/backend/.venv/bin:$PATH"
 EXPOSE 5001
 
-CMD ["python", "run_surreal.py"]
+CMD ["python", "run.py"]
