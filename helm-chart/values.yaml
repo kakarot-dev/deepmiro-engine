@@ -20,32 +20,17 @@ mcp:
       memory: "512Mi"
       cpu: "500m"
 
-neo4j:
-  image: neo4j:5.15-community
-  boltPort: 7687
-  httpPort: 7474
-  heap: "3G"
-  pagecache: "1G"
-  storage: 50Gi
+surrealdb:
+  image: surrealdb/surrealdb:latest
+  port: 8000
+  storage: 20Gi
   resources:
     requests:
-      memory: "3Gi"
-      cpu: "1500m"
-    limits:
-      memory: "4Gi"
-      cpu: "2000m"
-
-redis:
-  image: redis:7-alpine
-  port: 6379
-  storage: 5Gi
-  resources:
-    requests:
-      memory: "128Mi"
-      cpu: "100m"
-    limits:
       memory: "256Mi"
       cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
 
 ingress:
   enabled: true
@@ -54,7 +39,13 @@ ingress:
 
 llm:
   baseUrl: "https://api.fireworks.ai/inference/v1"
-  modelName: "accounts/fireworks/models/qwen3-8b"
+  modelName: "accounts/fireworks/models/minimax-m2p5"
+  boostModelName: "accounts/fireworks/models/mixtral-8x22b-instruct"
+
+embedding:
+  baseUrl: "https://api.fireworks.ai/inference"
+  model: "nomic-ai/nomic-embed-text-v1.5"
+  dimensions: 768
 
 uploads:
   storage: 20Gi

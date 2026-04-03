@@ -45,19 +45,49 @@ spec:
           value: {{ .Values.llm.baseUrl | quote }}
         - name: LLM_MODEL_NAME
           value: {{ .Values.llm.modelName | quote }}
-        - name: NEO4J_URI
-          value: "bolt://{{ include "mirofish.fullname" . }}-neo4j:{{ .Values.neo4j.boltPort }}"
-        - name: NEO4J_USER
-          value: neo4j
-        - name: NEO4J_PASSWORD
+        - name: LLM_BOOST_API_KEY
           valueFrom:
             secretKeyRef:
               name: {{ include "mirofish.fullname" . }}-secrets
-              key: neo4j-password
+              key: llm-api-key
+        - name: LLM_BOOST_BASE_URL
+          value: {{ .Values.llm.baseUrl | quote }}
+        - name: LLM_BOOST_MODEL_NAME
+          value: {{ .Values.llm.boostModelName | quote }}
+        - name: USE_SURREALDB
+          value: "true"
+        - name: SURREAL_URL
+          value: "ws://{{ include "mirofish.fullname" . }}-surreal:8000"
+        - name: SURREAL_NAMESPACE
+          value: mirofish
+        - name: SURREAL_DATABASE
+          value: production
+        - name: SURREAL_USER
+          value: root
+        - name: SURREAL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "mirofish.fullname" . }}-secrets
+              key: surreal-password
+        - name: EMBEDDING_PROVIDER
+          value: openai
+        - name: EMBEDDING_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "mirofish.fullname" . }}-secrets
+              key: llm-api-key
+        - name: EMBEDDING_BASE_URL
+          value: {{ .Values.embedding.baseUrl | quote }}
+        - name: EMBEDDING_MODEL
+          value: {{ .Values.embedding.model | quote }}
+        - name: EMBEDDING_DIMENSIONS
+          value: {{ .Values.embedding.dimensions | quote }}
         - name: FLASK_HOST
           value: "0.0.0.0"
         - name: FLASK_PORT
           value: {{ .Values.backend.port | quote }}
+        - name: ZEP_API_KEY
+          value: "surreal-mode"
         resources:
           {{- toYaml .Values.backend.resources | nindent 10 }}
         volumeMounts:
