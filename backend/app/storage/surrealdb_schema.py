@@ -60,6 +60,8 @@ DEFINE INDEX idx_entity_vec ON entity FIELDS embedding
 SCHEMA_RELATION = """
 DEFINE TABLE relation SCHEMAFULL;
 
+DEFINE FIELD in              ON relation TYPE record<entity>;
+DEFINE FIELD out             ON relation TYPE record<entity>;
 DEFINE FIELD graph_id        ON relation TYPE string    ASSERT $value != NONE;
 DEFINE FIELD name            ON relation TYPE string    DEFAULT "";
 DEFINE FIELD fact            ON relation TYPE string    DEFAULT "";
@@ -194,12 +196,14 @@ DEFINE FIELD profiles_count  ON simulation TYPE int      DEFAULT 0;
 DEFINE FIELD entity_types    ON simulation TYPE array<string> DEFAULT [];
 DEFINE FIELD config_json     ON simulation TYPE string   DEFAULT "{}";
 DEFINE FIELD error           ON simulation TYPE option<string>;
+DEFINE FIELD user_id         ON simulation TYPE option<string>;
 DEFINE FIELD created_at      ON simulation TYPE datetime DEFAULT time::now();
 DEFINE FIELD updated_at      ON simulation TYPE datetime DEFAULT time::now();
 
 DEFINE INDEX idx_simulation_id      ON simulation FIELDS simulation_id UNIQUE;
 DEFINE INDEX idx_simulation_project ON simulation FIELDS project_id;
 DEFINE INDEX idx_simulation_status  ON simulation FIELDS status;
+DEFINE INDEX idx_simulation_user    ON simulation FIELDS user_id;
 """
 
 # ---------------------------------------------------------------------------
@@ -251,6 +255,23 @@ DEFINE FIELD updated_at   ON ontology TYPE datetime DEFAULT time::now();
 DEFINE INDEX idx_ontology_graph ON ontology FIELDS graph_id UNIQUE;
 """
 
+# ---------------------------------------------------------------------------
+# Agent chat memory table (AVM smart paging)
+# ---------------------------------------------------------------------------
+
+SCHEMA_AGENT_CHAT_MEMORY = """
+DEFINE TABLE agent_chat_memory SCHEMAFULL;
+
+DEFINE FIELD simulation_id ON agent_chat_memory TYPE string   ASSERT $value != NONE;
+DEFINE FIELD agent_id      ON agent_chat_memory TYPE int      ASSERT $value != NONE;
+DEFINE FIELD platform      ON agent_chat_memory TYPE string   DEFAULT "twitter";
+DEFINE FIELD records_json  ON agent_chat_memory TYPE string   DEFAULT "[]";
+DEFINE FIELD records_count ON agent_chat_memory TYPE int      DEFAULT 0;
+DEFINE FIELD updated_at    ON agent_chat_memory TYPE datetime DEFAULT time::now();
+
+DEFINE INDEX idx_acm_sim_agent ON agent_chat_memory FIELDS simulation_id, agent_id, platform UNIQUE;
+"""
+
 
 # ---------------------------------------------------------------------------
 # Public helpers
@@ -266,6 +287,7 @@ ALL_SCHEMAS = [
     SCHEMA_SIMULATION,
     SCHEMA_SIMULATION_RUN,
     SCHEMA_ONTOLOGY,
+    SCHEMA_AGENT_CHAT_MEMORY,
 ]
 
 

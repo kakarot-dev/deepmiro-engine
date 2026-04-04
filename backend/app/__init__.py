@@ -103,6 +103,13 @@ def create_app(config_class=Config):
     if should_log_startup:
         _recover_interrupted_simulations(logger)
     
+    # Extract X-User-Id from request headers (set by hosted service / CF Worker)
+    from flask import g
+    @app.before_request
+    def extract_user_context():
+        g.user_id = request.headers.get('X-User-Id')
+        g.user_tier = request.headers.get('X-User-Tier')
+
     # 请求日志中间件
     @app.before_request
     def log_request():

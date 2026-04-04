@@ -587,6 +587,82 @@ class SurrealDBStorage(GraphStorage):
     # ================================================================
 
     # ================================================================
+    # Agent chat memory (AVM smart paging)
+    # ================================================================
+
+    def save_agent_memory(
+        self,
+        simulation_id: str,
+        agent_id: int,
+        platform: str,
+        records_json: str,
+        records_count: int,
+    ) -> None:
+        """Upsert serialized chat memory for one agent."""
+        self._query(
+            """
+            UPSERT agent_chat_memory SET
+                simulation_id = $sid,
+                agent_id      = $aid,
+                platform      = $plat,
+                records_json  = $rj,
+                records_count = $rc,
+                updated_at    = time::now()
+            WHERE simulation_id = $sid
+              AND agent_id      = $aid
+              AND platform      = $plat;
+            """,
+            {
+                "sid": simulation_id,
+                "aid": agent_id,
+                "plat": platform,
+                "rj": records_json,
+                "rc": records_count,
+            },
+        )
+
+    def load_agent_memory(
+        self,
+        simulation_id: str,
+        agent_id: int,
+        platform: str,
+    ) -> Optional[str]:
+        """Load serialized chat memory for one agent. Returns JSON string or None."""
+        result = self._query(
+            """
+            SELECT records_json FROM agent_chat_memory
+            WHERE simulation_id = $sid
+              AND agent_id      = $aid
+              AND platform      = $plat
+            LIMIT 1;
+            """,
+            {"sid": simulation_id, "aid": agent_id, "plat": platform},
+        )
+        rows = self._rows(result)
+        if rows:
+            return rows[0].get("records_json")
+        return None
+
+    def load_agent_memories_batch(
+        self,
+        simulation_id: str,
+        agent_ids: list,
+        platform: str,
+    ) -> Dict[int, str]:
+        """Batch-load chat memory for multiple agents. Returns {agent_id: json_str}."""
+        result = self._query(
+            """
+            SELECT agent_id, records_json FROM agent_chat_memory
+            WHERE simulation_id = $sid
+              AND agent_id IN $aids
+              AND platform = $plat;
+            """,
+            {"sid": simulation_id, "aids": agent_ids, "plat": platform},
+        )
+        rows = self._rows(result)
+        return {r["agent_id"]: r.get("records_json", "[]") for r in rows}
+
+    # ================================================================
     # Simulation state persistence (replaces state.json)
     # ================================================================
 
@@ -679,12 +755,20 @@ class SurrealDBStorage(GraphStorage):
             params,
         )
 
-    def list_simulations(self, limit: int = 50) -> List[Dict[str, Any]]:
-        """List simulations ordered by creation time (newest first)."""
-        result = self._query(
-            "SELECT * FROM simulation ORDER BY created_at DESC LIMIT $limit;",
-            {"limit": limit},
-        )
+    def list_simulations(self, limit: int = 50, user_id: str | None = None) -> List[Dict[str, Any]]:
+        """List simulations ordered by creation time (newest first).
+        If user_id is provided, only return simulations owned by that user.
+        """
+        if user_id:
+            result = self._query(
+                "SELECT * FROM simulation WHERE user_id = $uid ORDER BY created_at DESC LIMIT $limit;",
+                {"uid": user_id, "limit": limit},
+            )
+        else:
+            result = self._query(
+                "SELECT * FROM simulation ORDER BY created_at DESC LIMIT $limit;",
+                {"limit": limit},
+            )
         return self._rows(result)
 
     # ================================================================

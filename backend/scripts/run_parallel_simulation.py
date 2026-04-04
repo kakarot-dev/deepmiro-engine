@@ -72,6 +72,7 @@ import multiprocessing
 import random
 import signal
 import sqlite3
+import time
 import warnings
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
@@ -156,6 +157,15 @@ def init_logging_for_simulation(simulation_dir: str):
 
 
 from action_logger import SimulationLogManager, PlatformActionLogger
+
+# AVM smart paging (optional — gracefully degrades if SurrealDB unavailable)
+_avm_pager_available = False
+try:
+    from app.storage.factory import get_storage
+    from app.storage.avm import AgentPager
+    _avm_pager_available = True
+except ImportError:
+    pass
 
 try:
     from camel.models import ModelFactory
@@ -1151,31 +1161,66 @@ async def run_twitter_simulation(
     db_path = os.path.join(simulation_dir, "twitter_simulation.db")
     if os.path.exists(db_path):
         os.remove(db_path)
-    
+
+    llm_semaphore = config.get("oasis_semaphore", 30)
     result.env = oasis.make(
         agent_graph=result.agent_graph,
         platform=oasis.DefaultPlatformType.TWITTER,
         database_path=db_path,
-        semaphore=30,  # 限制最大并发 LLM 请求数，防止 API 过载
+        semaphore=llm_semaphore,
     )
-    
+
     await result.env.reset()
-    log_info("环境已启动")
-    
+
+    # Enable WAL mode for concurrent read access during simulation
+    _conn = sqlite3.connect(db_path)
+    _conn.execute("PRAGMA journal_mode=WAL")
+    _conn.close()
+
+    log_info(f"环境已启动 (semaphore={llm_semaphore})")
+
+    # Conditional rec table update — skip unless N rounds have elapsed
+    rec_update_interval = config.get("rec_update_interval", 3)
+    if rec_update_interval > 1 and hasattr(result.env, 'platform'):
+        _original_rec_update = result.env.platform.update_rec_table
+        _rec_rounds_since_update = [0]  # mutable counter in closure
+
+        async def _conditional_rec_update():
+            _rec_rounds_since_update[0] += 1
+            if _rec_rounds_since_update[0] >= rec_update_interval:
+                await _original_rec_update()
+                _rec_rounds_since_update[0] = 0
+
+        result.env.platform.update_rec_table = _conditional_rec_update
+        log_info(f"Rec table update interval: every {rec_update_interval} rounds")
+
+    # AVM smart paging — evict all agents to stub state
+    twitter_pager = None
+    sim_id = config.get("simulation_id", "")
+    if _avm_pager_available and sim_id and config.get("enable_paging", True):
+        try:
+            storage = get_storage()
+            twitter_pager = AgentPager(storage, sim_id, "twitter")
+            twitter_pager.evict_all(result.agent_graph)
+            log_info("AVM paging enabled")
+        except Exception as exc:
+            log_info(f"AVM paging unavailable: {exc}")
+            twitter_pager = None
+
     if action_logger:
         action_logger.log_simulation_start(config)
-    
+
     total_actions = 0
     last_rowid = 0  # 跟踪数据库中最后处理的行号（使用 rowid 避免 created_at 格式差异）
-    
+
     # 执行初始事件
     event_config = config.get("event_config", {})
     initial_posts = event_config.get("initial_posts", [])
-    
+
     # 记录 round 0 开始（初始事件阶段）
     if action_logger:
         action_logger.log_round_start(0, 0)  # round 0, simulated_hour 0
-    
+
     initial_action_count = 0
     if initial_posts:
         initial_actions = {}
@@ -1250,14 +1295,27 @@ async def run_twitter_simulation(
                 action_logger.log_round_end(round_num + 1, 0)
             continue
         
+        # AVM: hydrate active agents before step
+        active_ids = [aid for aid, _ in active_agents]
+        if twitter_pager:
+            twitter_pager.hydrate(result.agent_graph, active_ids)
+
         actions = {agent: LLMAction() for _, agent in active_agents}
+        t_step_start = time.monotonic()
         await result.env.step(actions)
-        
+        t_step = time.monotonic() - t_step_start
+
+        # AVM: evict all agents after step
+        if twitter_pager:
+            twitter_pager.evict_all(result.agent_graph)
+
         # 从数据库获取实际执行的动作并记录
+        t_fetch_start = time.monotonic()
         actual_actions, last_rowid = fetch_new_actions_from_db(
             db_path, last_rowid, agent_names
         )
-        
+        t_fetch = time.monotonic() - t_fetch_start
+
         round_action_count = 0
         for action_data in actual_actions:
             if action_logger:
@@ -1270,23 +1328,31 @@ async def run_twitter_simulation(
                 )
                 total_actions += 1
                 round_action_count += 1
-        
+
         if action_logger:
             action_logger.log_round_end(round_num + 1, round_action_count)
-        
+
+        t_round = time.monotonic() - t_step_start
+        if (round_num + 1) % 5 == 0 or t_round > 30:
+            log_info(
+                f"Round {round_num + 1}/{total_rounds} "
+                f"[{len(active_agents)} agents, {round_action_count} actions] "
+                f"step={t_step:.1f}s fetch={t_fetch:.1f}s total={t_round:.1f}s"
+            )
+
         if (round_num + 1) % 20 == 0:
             progress = (round_num + 1) / total_rounds * 100
-            log_info(f"Day {simulated_day}, {simulated_hour:02d}:00 - Round {round_num + 1}/{total_rounds} ({progress:.1f}%)")
-    
+            log_info(f"Day {simulated_day}, {simulated_hour:02d}:00 - {progress:.1f}%")
+
     # 注意：不关闭环境，保留给Interview使用
-    
+
     if action_logger:
         action_logger.log_simulation_end(total_rounds, total_actions)
-    
+
     result.total_actions = total_actions
     elapsed = (datetime.now() - start_time).total_seconds()
     log_info(f"模拟循环完成! 耗时: {elapsed:.1f}秒, 总动作: {total_actions}")
-    
+
     return result
 
 
@@ -1342,31 +1408,66 @@ async def run_reddit_simulation(
     db_path = os.path.join(simulation_dir, "reddit_simulation.db")
     if os.path.exists(db_path):
         os.remove(db_path)
-    
+
+    llm_semaphore = config.get("oasis_semaphore", 30)
     result.env = oasis.make(
         agent_graph=result.agent_graph,
         platform=oasis.DefaultPlatformType.REDDIT,
         database_path=db_path,
-        semaphore=30,  # 限制最大并发 LLM 请求数，防止 API 过载
+        semaphore=llm_semaphore,
     )
-    
+
     await result.env.reset()
-    log_info("环境已启动")
-    
+
+    # Enable WAL mode for concurrent read access during simulation
+    _conn = sqlite3.connect(db_path)
+    _conn.execute("PRAGMA journal_mode=WAL")
+    _conn.close()
+
+    log_info(f"环境已启动 (semaphore={llm_semaphore})")
+
+    # Conditional rec table update — skip unless N rounds have elapsed
+    rec_update_interval = config.get("rec_update_interval", 3)
+    if rec_update_interval > 1 and hasattr(result.env, 'platform'):
+        _original_rec_update = result.env.platform.update_rec_table
+        _rec_rounds_since_update = [0]  # mutable counter in closure
+
+        async def _conditional_rec_update():
+            _rec_rounds_since_update[0] += 1
+            if _rec_rounds_since_update[0] >= rec_update_interval:
+                await _original_rec_update()
+                _rec_rounds_since_update[0] = 0
+
+        result.env.platform.update_rec_table = _conditional_rec_update
+        log_info(f"Rec table update interval: every {rec_update_interval} rounds")
+
+    # AVM smart paging — evict all agents to stub state
+    reddit_pager = None
+    sim_id = config.get("simulation_id", "")
+    if _avm_pager_available and sim_id and config.get("enable_paging", True):
+        try:
+            storage = get_storage()
+            reddit_pager = AgentPager(storage, sim_id, "reddit")
+            reddit_pager.evict_all(result.agent_graph)
+            log_info("AVM paging enabled")
+        except Exception as exc:
+            log_info(f"AVM paging unavailable: {exc}")
+            reddit_pager = None
+
     if action_logger:
         action_logger.log_simulation_start(config)
-    
+
     total_actions = 0
     last_rowid = 0  # 跟踪数据库中最后处理的行号（使用 rowid 避免 created_at 格式差异）
-    
+
     # 执行初始事件
     event_config = config.get("event_config", {})
     initial_posts = event_config.get("initial_posts", [])
-    
+
     # 记录 round 0 开始（初始事件阶段）
     if action_logger:
         action_logger.log_round_start(0, 0)  # round 0, simulated_hour 0
-    
+
     initial_action_count = 0
     if initial_posts:
         initial_actions = {}
@@ -1449,14 +1550,27 @@ async def run_reddit_simulation(
                 action_logger.log_round_end(round_num + 1, 0)
             continue
         
+        # AVM: hydrate active agents before step
+        active_ids = [aid for aid, _ in active_agents]
+        if reddit_pager:
+            reddit_pager.hydrate(result.agent_graph, active_ids)
+
         actions = {agent: LLMAction() for _, agent in active_agents}
+        t_step_start = time.monotonic()
         await result.env.step(actions)
-        
+        t_step = time.monotonic() - t_step_start
+
+        # AVM: evict all agents after step
+        if reddit_pager:
+            reddit_pager.evict_all(result.agent_graph)
+
         # 从数据库获取实际执行的动作并记录
+        t_fetch_start = time.monotonic()
         actual_actions, last_rowid = fetch_new_actions_from_db(
             db_path, last_rowid, agent_names
         )
-        
+        t_fetch = time.monotonic() - t_fetch_start
+
         round_action_count = 0
         for action_data in actual_actions:
             if action_logger:
@@ -1469,23 +1583,31 @@ async def run_reddit_simulation(
                 )
                 total_actions += 1
                 round_action_count += 1
-        
+
         if action_logger:
             action_logger.log_round_end(round_num + 1, round_action_count)
-        
+
+        t_round = time.monotonic() - t_step_start
+        if (round_num + 1) % 5 == 0 or t_round > 30:
+            log_info(
+                f"Round {round_num + 1}/{total_rounds} "
+                f"[{len(active_agents)} agents, {round_action_count} actions] "
+                f"step={t_step:.1f}s fetch={t_fetch:.1f}s total={t_round:.1f}s"
+            )
+
         if (round_num + 1) % 20 == 0:
             progress = (round_num + 1) / total_rounds * 100
-            log_info(f"Day {simulated_day}, {simulated_hour:02d}:00 - Round {round_num + 1}/{total_rounds} ({progress:.1f}%)")
-    
+            log_info(f"Day {simulated_day}, {simulated_hour:02d}:00 - {progress:.1f}%")
+
     # 注意：不关闭环境，保留给Interview使用
-    
+
     if action_logger:
         action_logger.log_simulation_end(total_rounds, total_actions)
-    
+
     result.total_actions = total_actions
     elapsed = (datetime.now() - start_time).total_seconds()
     log_info(f"模拟循环完成! 耗时: {elapsed:.1f}秒, 总动作: {total_actions}")
-    
+
     return result
 
 

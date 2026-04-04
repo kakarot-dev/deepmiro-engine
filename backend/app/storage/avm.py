@@ -9,8 +9,9 @@ Memory budget:  500 agents x persona only + 20 active x full context
               = ~1-2 GB  (vs 7-10 GB without paging)
 """
 
+import json
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set
 
 logger = logging.getLogger("mirofish.avm")
 
@@ -298,3 +299,206 @@ class AgentVirtualMemory:
                 simulation_id, agent_id, exc,
             )
         return feed
+
+
+# =====================================================================
+# AgentPager — hydrate / evict OASIS agent memory per round
+# =====================================================================
+
+# Maximum memory records to persist per agent (cap unbounded growth)
+_MAX_MEMORY_RECORDS = 20
+
+
+class AgentPager:
+    """
+    Manages the hydrate/evict cycle for OASIS SocialAgent objects.
+
+    All agents remain in the AgentGraph as lightweight stubs (~7 KB each).
+    Before each round, active agents are *hydrated* by restoring their
+    ChatHistoryMemory from SurrealDB.  After the round, memory is saved
+    back and evicted from the Python objects.
+
+    Usage::
+
+        pager = AgentPager(storage, simulation_id, "twitter")
+        # after generate_twitter_agent_graph:
+        pager.evict_all(agent_graph)
+
+        # per round:
+        pager.hydrate(agent_graph, active_agent_ids)
+        await env.step(actions)
+        pager.evict_all(agent_graph)
+    """
+
+    def __init__(self, storage, simulation_id: str, platform: str):
+        self._storage = storage
+        self._simulation_id = simulation_id
+        self._platform = platform
+        self._hydrated: Set[int] = set()
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def hydrate(self, agent_graph, agent_ids: List[int]) -> None:
+        """Restore chat memory for agents about to act this round."""
+        if not agent_ids:
+            return
+
+        memories = self._storage.load_agent_memories_batch(
+            self._simulation_id, agent_ids, self._platform,
+        )
+
+        for aid in agent_ids:
+            try:
+                agent = agent_graph.get_agent(aid)
+            except Exception:
+                continue
+
+            records_json = memories.get(aid)
+            if records_json:
+                self._restore_memory(agent, records_json)
+
+            self._hydrated.add(aid)
+
+        logger.debug(
+            "AgentPager: hydrated %d agents for %s",
+            len(agent_ids), self._platform,
+        )
+
+    def evict_all(self, agent_graph) -> None:
+        """Save memory for hydrated agents, then clear it."""
+        for aid in list(self._hydrated):
+            try:
+                agent = agent_graph.get_agent(aid)
+            except Exception:
+                continue
+
+            records_json = self._serialize_memory(agent)
+            if records_json and records_json != "[]":
+                records = json.loads(records_json)
+                self._storage.save_agent_memory(
+                    self._simulation_id,
+                    aid,
+                    self._platform,
+                    records_json,
+                    len(records),
+                )
+
+            self._clear_memory(agent)
+
+        evicted = len(self._hydrated)
+        self._hydrated.clear()
+        logger.debug(
+            "AgentPager: evicted %d agents for %s",
+            evicted, self._platform,
+        )
+
+    # ------------------------------------------------------------------
+    # Serialization helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _serialize_memory(agent) -> str:
+        """Extract chat memory records from agent and return JSON string.
+
+        Tries multiple strategies to accommodate different CAMEL versions:
+        1. MemoryRecord.to_dict()  (CAMEL >=0.2.50)
+        2. dict() on each record
+        3. Fallback to empty list
+        """
+        records = []
+        try:
+            # CAMEL ChatAgent stores memory in .memory (ChatHistoryMemory)
+            mem = getattr(agent, 'memory', None)
+            if mem is None:
+                return "[]"
+
+            # ChatHistoryMemory.retrieve() returns list of ContextRecord
+            raw = None
+            if hasattr(mem, 'retrieve'):
+                raw = mem.retrieve()
+            elif hasattr(mem, 'get_context'):
+                raw = mem.get_context()
+
+            if not raw:
+                return "[]"
+
+            # Cap to last N records
+            raw = raw[-_MAX_MEMORY_RECORDS:]
+
+            for record in raw:
+                # Strategy 1: ContextRecord wraps MemoryRecord
+                inner = getattr(record, 'memory_record', record)
+                if hasattr(inner, 'to_dict'):
+                    records.append(inner.to_dict())
+                elif hasattr(inner, '__dict__'):
+                    records.append(inner.__dict__)
+                else:
+                    records.append(str(inner))
+
+        except Exception as exc:
+            logger.warning("AgentPager: serialize failed: %s", exc)
+            return "[]"
+
+        try:
+            return json.dumps(records, default=str)
+        except Exception:
+            return "[]"
+
+    @staticmethod
+    def _restore_memory(agent, records_json: str) -> None:
+        """Deserialize memory records and load into agent's ChatHistoryMemory."""
+        try:
+            records = json.loads(records_json)
+            if not records:
+                return
+
+            mem = getattr(agent, 'memory', None)
+            if mem is None:
+                return
+
+            # Try to import MemoryRecord for proper deserialization
+            try:
+                from camel.memories import MemoryRecord
+                has_memory_record = True
+            except ImportError:
+                has_memory_record = False
+
+            # Clear existing memory before restoring
+            if hasattr(mem, 'clear'):
+                mem.clear()
+
+            for rec_dict in records:
+                if has_memory_record and hasattr(MemoryRecord, 'from_dict'):
+                    try:
+                        mem_record = MemoryRecord.from_dict(rec_dict)
+                        if hasattr(mem, 'write_record'):
+                            mem.write_record(mem_record)
+                            continue
+                    except Exception:
+                        pass
+
+                # Fallback: write raw record if memory supports it
+                if hasattr(mem, 'write_record'):
+                    try:
+                        mem.write_record(rec_dict)
+                    except Exception:
+                        pass
+
+        except Exception as exc:
+            logger.warning("AgentPager: restore failed: %s", exc)
+
+    @staticmethod
+    def _clear_memory(agent) -> None:
+        """Evict memory from agent to free RAM."""
+        try:
+            mem = getattr(agent, 'memory', None)
+            if mem is not None and hasattr(mem, 'clear'):
+                mem.clear()
+
+            # Also clear tool output history if present
+            if hasattr(agent, '_tool_output_history'):
+                agent._tool_output_history = []
+        except Exception as exc:
+            logger.debug("AgentPager: clear_memory: %s", exc)

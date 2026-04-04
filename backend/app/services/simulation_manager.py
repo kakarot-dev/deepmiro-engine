@@ -235,6 +235,7 @@ class SimulationManager:
         graph_id: str,
         enable_twitter: bool = True,
         enable_reddit: bool = True,
+        user_id: Optional[str] = None,
     ) -> SimulationState:
         """
         创建新的模拟
@@ -264,7 +265,10 @@ class SimulationManager:
         storage = _get_surreal_storage()
         if storage:
             try:
-                storage.create_simulation(state.to_dict())
+                sim_data = state.to_dict()
+                if user_id:
+                    sim_data["user_id"] = user_id
+                storage.create_simulation(sim_data)
             except Exception as exc:
                 logger.warning("SurrealDB create_simulation failed: %s", exc)
 
@@ -506,8 +510,10 @@ class SimulationManager:
         """获取模拟状态"""
         return self._load_simulation_state(simulation_id)
     
-    def list_simulations(self, project_id: Optional[str] = None) -> List[SimulationState]:
-        """列出所有模拟 (SurrealDB preferred, file fallback)"""
+    def list_simulations(self, project_id: Optional[str] = None, user_id: Optional[str] = None) -> List[SimulationState]:
+        """列出所有模拟 (SurrealDB preferred, file fallback).
+        If user_id is provided, only return simulations owned by that user.
+        """
         simulations = []
         seen_ids = set()
 
@@ -515,7 +521,7 @@ class SimulationManager:
         storage = _get_surreal_storage()
         if storage:
             try:
-                rows = storage.list_simulations(limit=200)
+                rows = storage.list_simulations(limit=200, user_id=user_id)
                 for row in rows:
                     sid = row.get("simulation_id", "")
                     pid = row.get("project_id", "")
