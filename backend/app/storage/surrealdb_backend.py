@@ -263,6 +263,8 @@ class SurrealDBStorage(GraphStorage):
         entity_summaries: List[str] = []
         for ent in entities:
             attrs = ent.get("attributes", {})
+            if not isinstance(attrs, dict):
+                attrs = {}
             summary = attrs.pop("summary", None) or attrs.get("description", None)
             if summary and len(str(summary)) > 10:
                 entity_summaries.append(str(summary))
