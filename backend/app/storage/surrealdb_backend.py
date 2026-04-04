@@ -655,15 +655,19 @@ class SurrealDBStorage(GraphStorage):
 
     def upsert_simulation(self, simulation_id: str, sim_data: Dict[str, Any]) -> None:
         """Upsert simulation — create or update atomically."""
+        # Skip datetime fields — schema defaults handle created_at, we set updated_at
+        SKIP_FIELDS = {"simulation_id", "updated_at", "created_at", "id"}
         set_clauses = ["simulation_id = $sid", "updated_at = time::now()"]
         params: Dict[str, Any] = {"sid": simulation_id}
         for key, value in sim_data.items():
-            if key in ("simulation_id", "updated_at"):
+            if key in SKIP_FIELDS:
                 continue
             if hasattr(value, 'isoformat'):
-                value = value.isoformat()
+                value = str(value)
             if isinstance(value, set):
                 value = list(value)
+            if value is None:
+                continue  # Skip None — let schema defaults handle it
             param_name = f"v_{key}"
             set_clauses.append(f"{key} = ${param_name}")
             params[param_name] = value
@@ -769,10 +773,17 @@ class SurrealDBStorage(GraphStorage):
 
     def upsert_run_state(self, simulation_id: str, run_data: Dict[str, Any]) -> None:
         """Upsert run state — create if not exists, update if exists."""
-        set_clauses = ["simulation_id = $sid"]
+        SKIP_FIELDS = {"simulation_id", "id"}
+        set_clauses = ["simulation_id = $sid", "updated_at = time::now()"]
         params: Dict[str, Any] = {"sid": simulation_id}
         for key, value in run_data.items():
-            if key == "simulation_id":
+            if key in SKIP_FIELDS:
+                continue
+            if hasattr(value, 'isoformat'):
+                value = str(value)
+            if isinstance(value, set):
+                value = list(value)
+            if value is None:
                 continue
             param_name = f"v_{key}"
             set_clauses.append(f"{key} = ${param_name}")
