@@ -366,14 +366,12 @@ class SimulationRunner:
                 }
                 if state.completed_at:
                     updates["completed_at"] = state.completed_at
-                existing = storage.get_run_state(state.simulation_id)
-                if existing:
-                    storage.update_run_state(state.simulation_id, updates)
-                else:
-                    run_data = dict(updates)
-                    run_data["simulation_id"] = state.simulation_id
+                # Always upsert — no check-then-create race condition
+                run_data = dict(updates)
+                run_data["simulation_id"] = state.simulation_id
+                if state.started_at:
                     run_data["started_at"] = state.started_at
-                    storage.create_run_state(run_data)
+                storage.upsert_run_state(state.simulation_id, run_data)
             except Exception as exc:
                 logger.warning("SurrealDB run_state save failed: %s", exc)
     

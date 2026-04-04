@@ -653,6 +653,26 @@ class SurrealDBStorage(GraphStorage):
             params,
         )
 
+    def upsert_simulation(self, simulation_id: str, sim_data: Dict[str, Any]) -> None:
+        """Upsert simulation — create or update atomically."""
+        set_clauses = ["simulation_id = $sid", "updated_at = time::now()"]
+        params: Dict[str, Any] = {"sid": simulation_id}
+        for key, value in sim_data.items():
+            if key in ("simulation_id", "updated_at"):
+                continue
+            if hasattr(value, 'isoformat'):
+                value = value.isoformat()
+            if isinstance(value, set):
+                value = list(value)
+            param_name = f"v_{key}"
+            set_clauses.append(f"{key} = ${param_name}")
+            params[param_name] = value
+        set_str = ", ".join(set_clauses)
+        self._query(
+            f"UPSERT simulation SET {set_str} WHERE simulation_id = $sid;",
+            params,
+        )
+
     def list_simulations(self, limit: int = 50) -> List[Dict[str, Any]]:
         """List simulations ordered by creation time (newest first)."""
         result = self._query(
@@ -744,6 +764,22 @@ class SurrealDBStorage(GraphStorage):
         set_str = ", ".join(set_clauses)
         self._query(
             f"UPDATE simulation_run SET {set_str} WHERE simulation_id = $sid;",
+            params,
+        )
+
+    def upsert_run_state(self, simulation_id: str, run_data: Dict[str, Any]) -> None:
+        """Upsert run state — create if not exists, update if exists."""
+        set_clauses = ["simulation_id = $sid"]
+        params: Dict[str, Any] = {"sid": simulation_id}
+        for key, value in run_data.items():
+            if key == "simulation_id":
+                continue
+            param_name = f"v_{key}"
+            set_clauses.append(f"{key} = ${param_name}")
+            params[param_name] = value
+        set_str = ", ".join(set_clauses)
+        self._query(
+            f"UPSERT simulation_run SET {set_str} WHERE simulation_id = $sid;",
             params,
         )
 

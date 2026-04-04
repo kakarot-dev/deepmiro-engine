@@ -174,26 +174,9 @@ class SimulationManager:
         storage = _get_surreal_storage()
         if storage:
             try:
-                existing = storage.get_simulation(state.simulation_id)
-                updates = {
-                    "status": state.status.value,
-                    "entities_count": state.entities_count,
-                    "profiles_count": state.profiles_count,
-                    "entity_types": state.entity_types,
-                    "error": state.error,
-                    "enable_twitter": state.enable_twitter,
-                    "enable_reddit": state.enable_reddit,
-                }
-                if existing:
-                    storage.update_simulation(state.simulation_id, updates)
-                else:
-                    sim_data = state.to_dict()
-                    sim_data["config_json"] = "{}"
-                    # Ensure all datetime values are strings
-                    for k, v in sim_data.items():
-                        if hasattr(v, 'isoformat'):
-                            sim_data[k] = v.isoformat()
-                    storage.create_simulation(sim_data)
+                sim_data = state.to_dict()
+                sim_data["config_json"] = sim_data.get("config_json", "{}")
+                storage.upsert_simulation(state.simulation_id, sim_data)
             except Exception as exc:
                 logger.warning("SurrealDB simulation save failed: %s", exc)
     
