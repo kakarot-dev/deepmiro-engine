@@ -189,6 +189,10 @@ class SimulationManager:
                 else:
                     sim_data = state.to_dict()
                     sim_data["config_json"] = "{}"
+                    # Ensure all datetime values are strings
+                    for k, v in sim_data.items():
+                        if hasattr(v, 'isoformat'):
+                            sim_data[k] = v.isoformat()
                     storage.create_simulation(sim_data)
             except Exception as exc:
                 logger.warning("SurrealDB simulation save failed: %s", exc)
