@@ -26,6 +26,19 @@ from .simulation_ipc import SimulationIPCClient, CommandType, IPCResponse
 
 logger = get_logger('mirofish.simulation_runner')
 
+
+def _get_surreal_storage():
+    """Get SurrealDB storage instance, or None if unavailable."""
+    try:
+        from ..storage.factory import get_storage
+        storage = get_storage()
+        from ..storage.surrealdb_backend import SurrealDBStorage
+        if isinstance(storage, SurrealDBStorage):
+            return storage
+    except Exception as exc:
+        logger.warning("SurrealDB storage unavailable for runner: %s", exc)
+    return None
+
 # 标记是否已注册清理函数
 _cleanup_registered = False
 
@@ -43,6 +56,7 @@ class RunnerStatus(str, Enum):
     STOPPED = "stopped"
     COMPLETED = "completed"
     FAILED = "failed"
+    INTERRUPTED = "interrupted"  # Process died unexpectedly (detected on startup)
 
 
 @dataclass
@@ -241,15 +255,32 @@ class SimulationRunner:
     
     @classmethod
     def _load_run_state(cls, simulation_id: str) -> Optional[SimulationRunState]:
-        """从文件加载运行状态"""
-        state_file = os.path.join(cls.RUN_STATE_DIR, simulation_id, "run_state.json")
-        if not os.path.exists(state_file):
-            return None
-        
+        """从 SurrealDB 或文件加载运行状态"""
+        data = None
+
+        # Try SurrealDB first
+        storage = _get_surreal_storage()
+        if storage:
+            try:
+                row = storage.get_run_state(simulation_id)
+                if row:
+                    data = row
+            except Exception as exc:
+                logger.warning("SurrealDB run_state load failed, falling back to file: %s", exc)
+
+        # File fallback
+        if data is None:
+            state_file = os.path.join(cls.RUN_STATE_DIR, simulation_id, "run_state.json")
+            if not os.path.exists(state_file):
+                return None
+            try:
+                with open(state_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+            except Exception as e:
+                logger.error(f"加载运行状态文件失败: {str(e)}")
+                return None
+
         try:
-            with open(state_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            
             state = SimulationRunState(
                 simulation_id=simulation_id,
                 runner_status=RunnerStatus(data.get("runner_status", "idle")),
@@ -257,7 +288,6 @@ class SimulationRunner:
                 total_rounds=data.get("total_rounds", 0),
                 simulated_hours=data.get("simulated_hours", 0),
                 total_simulation_hours=data.get("total_simulation_hours", 0),
-                # 各平台独立轮次和时间
                 twitter_current_round=data.get("twitter_current_round", 0),
                 reddit_current_round=data.get("reddit_current_round", 0),
                 twitter_simulated_hours=data.get("twitter_simulated_hours", 0),
@@ -274,22 +304,23 @@ class SimulationRunner:
                 error=data.get("error"),
                 process_pid=data.get("process_pid"),
             )
-            
-            # 加载最近动作
+
+            # Load recent actions from file data (SurrealDB rows won't have these)
             actions_data = data.get("recent_actions", [])
             for a in actions_data:
-                state.recent_actions.append(AgentAction(
-                    round_num=a.get("round_num", 0),
-                    timestamp=a.get("timestamp", ""),
-                    platform=a.get("platform", ""),
-                    agent_id=a.get("agent_id", 0),
-                    agent_name=a.get("agent_name", ""),
-                    action_type=a.get("action_type", ""),
-                    action_args=a.get("action_args", {}),
-                    result=a.get("result"),
-                    success=a.get("success", True),
-                ))
-            
+                if isinstance(a, dict):
+                    state.recent_actions.append(AgentAction(
+                        round_num=a.get("round_num", 0),
+                        timestamp=a.get("timestamp", ""),
+                        platform=a.get("platform", ""),
+                        agent_id=a.get("agent_id", 0),
+                        agent_name=a.get("agent_name", ""),
+                        action_type=a.get("action_type", ""),
+                        action_args=a.get("action_args", {}),
+                        result=a.get("result"),
+                        success=a.get("success", True),
+                    ))
+
             return state
         except Exception as e:
             logger.error(f"加载运行状态失败: {str(e)}")
@@ -297,17 +328,54 @@ class SimulationRunner:
     
     @classmethod
     def _save_run_state(cls, state: SimulationRunState):
-        """保存运行状态到文件"""
+        """保存运行状态到文件 + SurrealDB (dual write)"""
         sim_dir = os.path.join(cls.RUN_STATE_DIR, state.simulation_id)
         os.makedirs(sim_dir, exist_ok=True)
         state_file = os.path.join(sim_dir, "run_state.json")
-        
+
         data = state.to_detail_dict()
-        
+
+        # File write (always)
         with open(state_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        
+
         cls._run_states[state.simulation_id] = state
+
+        # SurrealDB write (best-effort)
+        storage = _get_surreal_storage()
+        if storage:
+            try:
+                updates = {
+                    "runner_status": state.runner_status.value,
+                    "current_round": state.current_round,
+                    "total_rounds": state.total_rounds,
+                    "simulated_hours": state.simulated_hours,
+                    "total_simulation_hours": state.total_simulation_hours,
+                    "twitter_current_round": state.twitter_current_round,
+                    "reddit_current_round": state.reddit_current_round,
+                    "twitter_simulated_hours": state.twitter_simulated_hours,
+                    "reddit_simulated_hours": state.reddit_simulated_hours,
+                    "twitter_running": state.twitter_running,
+                    "reddit_running": state.reddit_running,
+                    "twitter_actions_count": state.twitter_actions_count,
+                    "reddit_actions_count": state.reddit_actions_count,
+                    "twitter_completed": state.twitter_completed,
+                    "reddit_completed": state.reddit_completed,
+                    "process_pid": state.process_pid,
+                    "error": state.error,
+                }
+                if state.completed_at:
+                    updates["completed_at"] = state.completed_at
+                existing = storage.get_run_state(state.simulation_id)
+                if existing:
+                    storage.update_run_state(state.simulation_id, updates)
+                else:
+                    run_data = dict(updates)
+                    run_data["simulation_id"] = state.simulation_id
+                    run_data["started_at"] = state.started_at
+                    storage.create_run_state(run_data)
+            except Exception as exc:
+                logger.warning("SurrealDB run_state save failed: %s", exc)
     
     @classmethod
     def start_simulation(

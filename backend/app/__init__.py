@@ -16,6 +16,44 @@ from .config import Config
 from .utils.logger import setup_logger, get_logger
 
 
+def _recover_interrupted_simulations(logger):
+    """
+    Detect simulations that were marked 'running' in SurrealDB but whose
+    PID is no longer alive.  Mark them as 'interrupted' so users know.
+    """
+    try:
+        from .storage.factory import get_storage
+        from .storage.surrealdb_backend import SurrealDBStorage
+
+        storage = get_storage()
+        if not isinstance(storage, SurrealDBStorage):
+            return
+
+        interrupted = storage.detect_interrupted_simulations()
+        for row in interrupted:
+            sim_id = row.get("simulation_id", "")
+            old_pid = row.get("process_pid")
+            logger.warning(
+                "Recovering interrupted simulation: %s (pid=%s)", sim_id, old_pid
+            )
+            try:
+                storage.update_run_state(sim_id, {
+                    "runner_status": "interrupted",
+                    "twitter_running": False,
+                    "reddit_running": False,
+                    "error": f"Process {old_pid} no longer alive on startup",
+                })
+                # Also update the simulation table
+                storage.update_simulation(sim_id, {"status": "interrupted"})
+            except Exception as exc:
+                logger.error("Failed to mark simulation %s as interrupted: %s", sim_id, exc)
+
+        if interrupted:
+            logger.info("Recovered %d interrupted simulation(s)", len(interrupted))
+    except Exception as exc:
+        logger.warning("Startup recovery skipped (SurrealDB unavailable): %s", exc)
+
+
 def create_app(config_class=Config):
     """Flask应用工厂函数"""
     app = Flask(__name__)
@@ -47,6 +85,11 @@ def create_app(config_class=Config):
     SimulationRunner.register_cleanup()
     if should_log_startup:
         logger.info("已注册模拟进程清理函数")
+
+    # Startup recovery: detect simulations that were running when the
+    # pod/server was killed and mark them as "interrupted".
+    if should_log_startup:
+        _recover_interrupted_simulations(logger)
     
     # 请求日志中间件
     @app.before_request

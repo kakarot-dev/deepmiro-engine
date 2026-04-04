@@ -584,6 +584,338 @@ class SurrealDBStorage(GraphStorage):
     # Dict conversion helpers
     # ================================================================
 
+    # ================================================================
+    # Simulation state persistence (replaces state.json)
+    # ================================================================
+
+    def create_simulation(self, sim_data: Dict[str, Any]) -> str:
+        """Create a new simulation record. Returns simulation_id."""
+        sim_id = sim_data.get("simulation_id", str(_uuid.uuid4()))
+        self._query(
+            """
+            CREATE simulation CONTENT {
+                simulation_id: $sid,
+                project_id: $project_id,
+                graph_id: $graph_id,
+                status: $status,
+                enable_twitter: $enable_twitter,
+                enable_reddit: $enable_reddit,
+                entities_count: $entities_count,
+                profiles_count: $profiles_count,
+                entity_types: $entity_types,
+                config_json: $config_json,
+                error: $error,
+                created_at: time::now(),
+                updated_at: time::now()
+            };
+            """,
+            {
+                "sid": sim_id,
+                "project_id": sim_data.get("project_id", ""),
+                "graph_id": sim_data.get("graph_id", ""),
+                "status": sim_data.get("status", "created"),
+                "enable_twitter": sim_data.get("enable_twitter", True),
+                "enable_reddit": sim_data.get("enable_reddit", True),
+                "entities_count": sim_data.get("entities_count", 0),
+                "profiles_count": sim_data.get("profiles_count", 0),
+                "entity_types": sim_data.get("entity_types", []),
+                "config_json": sim_data.get("config_json", "{}"),
+                "error": sim_data.get("error"),
+            },
+        )
+        logger.info("Created simulation record: %s", sim_id)
+        return sim_id
+
+    def get_simulation(self, simulation_id: str) -> Optional[Dict[str, Any]]:
+        """Get simulation by simulation_id."""
+        result = self._query(
+            "SELECT * FROM simulation WHERE simulation_id = $sid LIMIT 1;",
+            {"sid": simulation_id},
+        )
+        rows = self._rows(result)
+        return rows[0] if rows else None
+
+    def update_simulation(self, simulation_id: str, updates: Dict[str, Any]) -> None:
+        """Update simulation fields. Automatically sets updated_at."""
+        updates["updated_at"] = "time::now()"
+        set_clauses = []
+        params: Dict[str, Any] = {"sid": simulation_id}
+        for key, value in updates.items():
+            if value == "time::now()":
+                set_clauses.append(f"{key} = time::now()")
+            else:
+                param_name = f"v_{key}"
+                set_clauses.append(f"{key} = ${param_name}")
+                params[param_name] = value
+        set_str = ", ".join(set_clauses)
+        self._query(
+            f"UPDATE simulation SET {set_str} WHERE simulation_id = $sid;",
+            params,
+        )
+
+    def list_simulations(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """List simulations ordered by creation time (newest first)."""
+        result = self._query(
+            "SELECT * FROM simulation ORDER BY created_at DESC LIMIT $limit;",
+            {"limit": limit},
+        )
+        return self._rows(result)
+
+    # ================================================================
+    # Simulation run state persistence (replaces run_state.json)
+    # ================================================================
+
+    def create_run_state(self, run_data: Dict[str, Any]) -> str:
+        """Create a simulation run state record."""
+        sim_id = run_data.get("simulation_id", "")
+        self._query(
+            """
+            CREATE simulation_run CONTENT {
+                simulation_id: $sid,
+                runner_status: $runner_status,
+                current_round: $current_round,
+                total_rounds: $total_rounds,
+                simulated_hours: $simulated_hours,
+                total_simulation_hours: $total_simulation_hours,
+                twitter_current_round: $twitter_current_round,
+                reddit_current_round: $reddit_current_round,
+                twitter_simulated_hours: $twitter_simulated_hours,
+                reddit_simulated_hours: $reddit_simulated_hours,
+                twitter_running: $twitter_running,
+                reddit_running: $reddit_running,
+                twitter_actions_count: $twitter_actions_count,
+                reddit_actions_count: $reddit_actions_count,
+                twitter_completed: $twitter_completed,
+                reddit_completed: $reddit_completed,
+                process_pid: $process_pid,
+                started_at: $started_at,
+                completed_at: $completed_at,
+                error: $error
+            };
+            """,
+            {
+                "sid": sim_id,
+                "runner_status": run_data.get("runner_status", "idle"),
+                "current_round": run_data.get("current_round", 0),
+                "total_rounds": run_data.get("total_rounds", 0),
+                "simulated_hours": run_data.get("simulated_hours", 0),
+                "total_simulation_hours": run_data.get("total_simulation_hours", 0),
+                "twitter_current_round": run_data.get("twitter_current_round", 0),
+                "reddit_current_round": run_data.get("reddit_current_round", 0),
+                "twitter_simulated_hours": run_data.get("twitter_simulated_hours", 0),
+                "reddit_simulated_hours": run_data.get("reddit_simulated_hours", 0),
+                "twitter_running": run_data.get("twitter_running", False),
+                "reddit_running": run_data.get("reddit_running", False),
+                "twitter_actions_count": run_data.get("twitter_actions_count", 0),
+                "reddit_actions_count": run_data.get("reddit_actions_count", 0),
+                "twitter_completed": run_data.get("twitter_completed", False),
+                "reddit_completed": run_data.get("reddit_completed", False),
+                "process_pid": run_data.get("process_pid"),
+                "started_at": run_data.get("started_at"),
+                "completed_at": run_data.get("completed_at"),
+                "error": run_data.get("error"),
+            },
+        )
+        logger.info("Created run state for simulation: %s", sim_id)
+        return sim_id
+
+    def get_run_state(self, simulation_id: str) -> Optional[Dict[str, Any]]:
+        """Get run state by simulation_id."""
+        result = self._query(
+            "SELECT * FROM simulation_run WHERE simulation_id = $sid LIMIT 1;",
+            {"sid": simulation_id},
+        )
+        rows = self._rows(result)
+        return rows[0] if rows else None
+
+    def update_run_state(self, simulation_id: str, updates: Dict[str, Any]) -> None:
+        """Update run state fields."""
+        set_clauses = []
+        params: Dict[str, Any] = {"sid": simulation_id}
+        for key, value in updates.items():
+            if value == "time::now()":
+                set_clauses.append(f"{key} = time::now()")
+            else:
+                param_name = f"v_{key}"
+                set_clauses.append(f"{key} = ${param_name}")
+                params[param_name] = value
+        if not set_clauses:
+            return
+        set_str = ", ".join(set_clauses)
+        self._query(
+            f"UPDATE simulation_run SET {set_str} WHERE simulation_id = $sid;",
+            params,
+        )
+
+    # ================================================================
+    # Agent profile persistence
+    # ================================================================
+
+    def save_agent_profiles(self, simulation_id: str, profiles: List[Dict[str, Any]]) -> None:
+        """Bulk-insert agent profiles into the agent table."""
+        for profile in profiles:
+            self._query(
+                """
+                CREATE agent CONTENT {
+                    simulation_id: $sid,
+                    graph_id: $graph_id,
+                    agent_id: $agent_id,
+                    user_name: $user_name,
+                    name: $name,
+                    bio: $bio,
+                    persona: $persona,
+                    persona_embedding: $persona_embedding,
+                    age: $age,
+                    gender: $gender,
+                    mbti: $mbti,
+                    country: $country,
+                    profession: $profession,
+                    interested_topics: $interested_topics,
+                    karma: $karma,
+                    friend_count: $friend_count,
+                    follower_count: $follower_count,
+                    statuses_count: $statuses_count,
+                    active: true,
+                    mood: "neutral",
+                    memory_summary: "",
+                    source_entity_uuid: $source_entity_uuid,
+                    source_entity_type: $source_entity_type,
+                    created_at: time::now(),
+                    updated_at: time::now()
+                };
+                """,
+                {
+                    "sid": simulation_id,
+                    "graph_id": profile.get("graph_id", ""),
+                    "agent_id": profile.get("user_id", profile.get("agent_id", 0)),
+                    "user_name": profile.get("user_name", profile.get("username", "")),
+                    "name": profile.get("name", ""),
+                    "bio": profile.get("bio", ""),
+                    "persona": profile.get("persona", ""),
+                    "persona_embedding": profile.get("persona_embedding", []),
+                    "age": profile.get("age"),
+                    "gender": profile.get("gender"),
+                    "mbti": profile.get("mbti"),
+                    "country": profile.get("country"),
+                    "profession": profile.get("profession"),
+                    "interested_topics": profile.get("interested_topics", []),
+                    "karma": profile.get("karma", 1000),
+                    "friend_count": profile.get("friend_count", 100),
+                    "follower_count": profile.get("follower_count", 150),
+                    "statuses_count": profile.get("statuses_count", 500),
+                    "source_entity_uuid": profile.get("source_entity_uuid"),
+                    "source_entity_type": profile.get("source_entity_type"),
+                },
+            )
+        logger.info(
+            "Saved %d agent profiles for simulation %s", len(profiles), simulation_id
+        )
+
+    def get_agent_profiles(self, simulation_id: str) -> List[Dict[str, Any]]:
+        """Get all agent profiles for a simulation."""
+        result = self._query(
+            "SELECT * FROM agent WHERE simulation_id = $sid ORDER BY agent_id ASC;",
+            {"sid": simulation_id},
+        )
+        return self._rows(result)
+
+    # ================================================================
+    # Simulation action persistence
+    # ================================================================
+
+    def save_action(self, action_data: Dict[str, Any]) -> None:
+        """Save a single simulation action."""
+        self._query(
+            """
+            CREATE simulation_action CONTENT {
+                simulation_id: $sid,
+                round_num: $round_num,
+                timestamp: time::now(),
+                platform: $platform,
+                agent_id: $agent_id,
+                agent_name: $agent_name,
+                action_type: $action_type,
+                action_args: $action_args,
+                result: $result,
+                success: $success
+            };
+            """,
+            {
+                "sid": action_data.get("simulation_id", ""),
+                "round_num": action_data.get("round_num", 0),
+                "platform": action_data.get("platform", "twitter"),
+                "agent_id": action_data.get("agent_id", 0),
+                "agent_name": action_data.get("agent_name", ""),
+                "action_type": action_data.get("action_type", ""),
+                "action_args": action_data.get("action_args", {}),
+                "result": action_data.get("result"),
+                "success": action_data.get("success", True),
+            },
+        )
+
+    def save_actions_batch(self, actions: List[Dict[str, Any]]) -> None:
+        """Save multiple simulation actions in a batch."""
+        for action in actions:
+            self.save_action(action)
+
+    def get_actions(
+        self,
+        simulation_id: str,
+        filters: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Get simulation actions with optional filters (platform, agent_id, round_num)."""
+        filters = filters or {}
+        where_clauses = ["simulation_id = $sid"]
+        params: Dict[str, Any] = {"sid": simulation_id}
+
+        if "platform" in filters:
+            where_clauses.append("platform = $platform")
+            params["platform"] = filters["platform"]
+        if "agent_id" in filters:
+            where_clauses.append("agent_id = $agent_id")
+            params["agent_id"] = filters["agent_id"]
+        if "round_num" in filters:
+            where_clauses.append("round_num = $round_num")
+            params["round_num"] = filters["round_num"]
+
+        limit = filters.get("limit", 1000)
+        params["limit"] = limit
+
+        where_str = " AND ".join(where_clauses)
+        result = self._query(
+            f"SELECT * FROM simulation_action WHERE {where_str} ORDER BY timestamp DESC LIMIT $limit;",
+            params,
+        )
+        return self._rows(result)
+
+    # ================================================================
+    # Interrupted simulation detection
+    # ================================================================
+
+    def detect_interrupted_simulations(self) -> List[Dict[str, Any]]:
+        """Find simulations marked as running but whose PID is no longer alive."""
+        result = self._query(
+            "SELECT * FROM simulation_run WHERE runner_status = 'running';",
+        )
+        rows = self._rows(result)
+        interrupted = []
+        for row in rows:
+            pid = row.get("process_pid")
+            if pid is not None:
+                import os as _os
+                try:
+                    _os.kill(pid, 0)  # check if process exists
+                except (OSError, ProcessLookupError):
+                    interrupted.append(row)
+            else:
+                # No PID recorded -- treat as interrupted
+                interrupted.append(row)
+        return interrupted
+
+    # ================================================================
+    # Dict conversion helpers
+    # ================================================================
+
     @staticmethod
     def _entity_to_dict(row: Dict[str, Any]) -> Dict[str, Any]:
         """Convert SurrealDB entity record to standard node dict."""

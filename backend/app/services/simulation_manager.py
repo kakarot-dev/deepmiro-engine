@@ -22,6 +22,20 @@ from ..utils.locale import t
 logger = get_logger('mirofish.simulation')
 
 
+def _get_surreal_storage():
+    """Get SurrealDB storage instance, or None if unavailable."""
+    try:
+        from ..storage.factory import get_storage
+        storage = get_storage()
+        # Only use if it's the SurrealDB backend
+        from ..storage.surrealdb_backend import SurrealDBStorage
+        if isinstance(storage, SurrealDBStorage):
+            return storage
+    except Exception as exc:
+        logger.warning("SurrealDB storage unavailable, file-only mode: %s", exc)
+    return None
+
+
 class SimulationStatus(str, Enum):
     """模拟状态"""
     CREATED = "created"
@@ -29,9 +43,10 @@ class SimulationStatus(str, Enum):
     READY = "ready"
     RUNNING = "running"
     PAUSED = "paused"
-    STOPPED = "stopped"      # 模拟被手动停止
-    COMPLETED = "completed"  # 模拟自然完成
+    STOPPED = "stopped"          # 模拟被手动停止
+    COMPLETED = "completed"      # 模拟自然完成
     FAILED = "failed"
+    INTERRUPTED = "interrupted"  # 进程意外终止（PID不存在���
 
 
 class PlatformType(str, Enum):
@@ -143,31 +158,67 @@ class SimulationManager:
         return sim_dir
     
     def _save_simulation_state(self, state: SimulationState):
-        """保存模拟状态到文件"""
+        """保存模拟状态到文件 + SurrealDB (dual write)"""
         sim_dir = self._get_simulation_dir(state.simulation_id)
         state_file = os.path.join(sim_dir, "state.json")
-        
+
         state.updated_at = datetime.now().isoformat()
-        
+
+        # File write (always -- backward compatible)
         with open(state_file, 'w', encoding='utf-8') as f:
             json.dump(state.to_dict(), f, ensure_ascii=False, indent=2)
-        
+
         self._simulations[state.simulation_id] = state
+
+        # SurrealDB write (best-effort)
+        storage = _get_surreal_storage()
+        if storage:
+            try:
+                existing = storage.get_simulation(state.simulation_id)
+                updates = {
+                    "status": state.status.value,
+                    "entities_count": state.entities_count,
+                    "profiles_count": state.profiles_count,
+                    "entity_types": state.entity_types,
+                    "error": state.error,
+                    "enable_twitter": state.enable_twitter,
+                    "enable_reddit": state.enable_reddit,
+                }
+                if existing:
+                    storage.update_simulation(state.simulation_id, updates)
+                else:
+                    sim_data = state.to_dict()
+                    sim_data["config_json"] = "{}"
+                    storage.create_simulation(sim_data)
+            except Exception as exc:
+                logger.warning("SurrealDB simulation save failed: %s", exc)
     
     def _load_simulation_state(self, simulation_id: str) -> Optional[SimulationState]:
-        """从文件加载模拟状态"""
+        """从 SurrealDB 或文件加载模拟状态"""
         if simulation_id in self._simulations:
             return self._simulations[simulation_id]
-        
-        sim_dir = self._get_simulation_dir(simulation_id)
-        state_file = os.path.join(sim_dir, "state.json")
-        
-        if not os.path.exists(state_file):
-            return None
-        
-        with open(state_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
+
+        data = None
+
+        # Try SurrealDB first
+        storage = _get_surreal_storage()
+        if storage:
+            try:
+                row = storage.get_simulation(simulation_id)
+                if row:
+                    data = row
+            except Exception as exc:
+                logger.warning("SurrealDB simulation load failed, falling back to file: %s", exc)
+
+        # Fall back to flat file
+        if data is None:
+            sim_dir = self._get_simulation_dir(simulation_id)
+            state_file = os.path.join(sim_dir, "state.json")
+            if not os.path.exists(state_file):
+                return None
+            with open(state_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
         state = SimulationState(
             simulation_id=simulation_id,
             project_id=data.get("project_id", ""),
@@ -187,7 +238,7 @@ class SimulationManager:
             updated_at=data.get("updated_at", datetime.now().isoformat()),
             error=data.get("error"),
         )
-        
+
         self._simulations[simulation_id] = state
         return state
     
@@ -221,10 +272,18 @@ class SimulationManager:
             enable_reddit=enable_reddit,
             status=SimulationStatus.CREATED,
         )
-        
+
+        # SurrealDB: create the record directly (avoids update in _save)
+        storage = _get_surreal_storage()
+        if storage:
+            try:
+                storage.create_simulation(state.to_dict())
+            except Exception as exc:
+                logger.warning("SurrealDB create_simulation failed: %s", exc)
+
         self._save_simulation_state(state)
         logger.info(f"创建模拟: {simulation_id}, project={project_id}, graph={graph_id}")
-        
+
         return state
     
     def prepare_simulation(
@@ -461,21 +520,40 @@ class SimulationManager:
         return self._load_simulation_state(simulation_id)
     
     def list_simulations(self, project_id: Optional[str] = None) -> List[SimulationState]:
-        """列出所有模拟"""
+        """列出所有模拟 (SurrealDB preferred, file fallback)"""
         simulations = []
-        
+        seen_ids = set()
+
+        # Try SurrealDB first
+        storage = _get_surreal_storage()
+        if storage:
+            try:
+                rows = storage.list_simulations(limit=200)
+                for row in rows:
+                    sid = row.get("simulation_id", "")
+                    pid = row.get("project_id", "")
+                    if project_id is not None and pid != project_id:
+                        continue
+                    state = self._load_simulation_state(sid)
+                    if state:
+                        simulations.append(state)
+                        seen_ids.add(sid)
+            except Exception as exc:
+                logger.warning("SurrealDB list_simulations failed, falling back to files: %s", exc)
+
+        # File fallback: pick up any simulations not yet in SurrealDB
         if os.path.exists(self.SIMULATION_DATA_DIR):
             for sim_id in os.listdir(self.SIMULATION_DATA_DIR):
-                # 跳过隐藏文件（如 .DS_Store）和非目录文件
+                if sim_id in seen_ids:
+                    continue
                 sim_path = os.path.join(self.SIMULATION_DATA_DIR, sim_id)
                 if sim_id.startswith('.') or not os.path.isdir(sim_path):
                     continue
-                
                 state = self._load_simulation_state(sim_id)
                 if state:
                     if project_id is None or state.project_id == project_id:
                         simulations.append(state)
-        
+
         return simulations
     
     def get_profiles(self, simulation_id: str, platform: str = "reddit") -> List[Dict[str, Any]]:

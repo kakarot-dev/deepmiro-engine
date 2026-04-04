@@ -333,21 +333,32 @@ class LLMClient:
     ) -> Dict[str, Any]:
         """
         Send a chat request and return parsed JSON.
-
-        Args:
-            messages: Message list
-            temperature: Temperature parameter
-            max_tokens: Maximum tokens
-
-        Returns:
-            Parsed JSON object
+        Falls back to retry without response_format if the provider
+        doesn't support it (e.g. Ollama, some Fireworks models).
         """
-        response = self.chat(
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            response_format={"type": "json_object"}
-        )
+        # Try with response_format first
+        try:
+            response = self.chat(
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_format={"type": "json_object"}
+            )
+        except Exception:
+            # Fallback: retry without response_format, add JSON instruction to prompt
+            logger.warning("response_format failed, retrying without it")
+            json_messages = list(messages)
+            if json_messages and json_messages[-1]["role"] == "user":
+                json_messages[-1] = {
+                    **json_messages[-1],
+                    "content": json_messages[-1]["content"] + "\n\nRespond with valid JSON only. No markdown, no explanation."
+                }
+            response = self.chat(
+                messages=json_messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+
         # Clean markdown code block markers
         cleaned_response = response.strip()
         cleaned_response = re.sub(r'^```(?:json)?\s*\n?', '', cleaned_response, flags=re.IGNORECASE)
