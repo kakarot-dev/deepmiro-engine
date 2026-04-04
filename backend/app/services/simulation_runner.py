@@ -298,9 +298,9 @@ class SimulationRunner:
                 reddit_completed=data.get("reddit_completed", False),
                 twitter_actions_count=data.get("twitter_actions_count", 0),
                 reddit_actions_count=data.get("reddit_actions_count", 0),
-                started_at=data.get("started_at"),
-                updated_at=data.get("updated_at", datetime.now().isoformat()),
-                completed_at=data.get("completed_at"),
+                started_at=str(data["started_at"]) if data.get("started_at") else None,
+                updated_at=str(data["updated_at"]) if data.get("updated_at") else datetime.now().isoformat(),
+                completed_at=str(data["completed_at"]) if data.get("completed_at") else None,
                 error=data.get("error"),
                 process_pid=data.get("process_pid"),
             )

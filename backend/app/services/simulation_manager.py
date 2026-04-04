@@ -101,7 +101,7 @@ class SimulationState:
             "status": self.status.value,
             "entities_count": self.entities_count,
             "profiles_count": self.profiles_count,
-            "entity_types": self.entity_types,
+            "entity_types": list(self.entity_types) if isinstance(self.entity_types, set) else self.entity_types,
             "config_generated": self.config_generated,
             "config_reasoning": self.config_reasoning,
             "current_round": self.current_round,
@@ -238,8 +238,8 @@ class SimulationManager:
             current_round=data.get("current_round", 0),
             twitter_status=data.get("twitter_status", "not_started"),
             reddit_status=data.get("reddit_status", "not_started"),
-            created_at=data.get("created_at", datetime.now().isoformat()),
-            updated_at=data.get("updated_at", datetime.now().isoformat()),
+            created_at=str(data["created_at"]) if "created_at" in data else datetime.now().isoformat(),
+            updated_at=str(data["updated_at"]) if "updated_at" in data else datetime.now().isoformat(),
             error=data.get("error"),
         )
 
