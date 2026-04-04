@@ -58,7 +58,7 @@ DEFINE INDEX idx_entity_vec ON entity FIELDS embedding
 # ---------------------------------------------------------------------------
 
 SCHEMA_RELATION = """
-DEFINE TABLE relation SCHEMAFULL;
+DEFINE TABLE relation TYPE RELATION SCHEMAFULL;
 
 DEFINE FIELD in              ON relation TYPE record<entity>;
 DEFINE FIELD out             ON relation TYPE record<entity>;
