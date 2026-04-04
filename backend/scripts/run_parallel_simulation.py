@@ -1179,20 +1179,31 @@ async def run_twitter_simulation(
 
     log_info(f"环境已启动 (semaphore={llm_semaphore})")
 
-    # Conditional rec table update — skip unless N rounds have elapsed
-    rec_update_interval = config.get("rec_update_interval", 3)
+    # Conditional rec table update — scale interval with agent count
+    agent_count = len(config.get("agent_configs", []))
+    if config.get("rec_update_interval"):
+        rec_update_interval = config["rec_update_interval"]
+    elif agent_count > 50:
+        rec_update_interval = 15
+    elif agent_count > 20:
+        rec_update_interval = 10
+    else:
+        rec_update_interval = 5
+
     if rec_update_interval > 1 and hasattr(result.env, 'platform'):
         _original_rec_update = result.env.platform.update_rec_table
-        _rec_rounds_since_update = [0]  # mutable counter in closure
+        _rec_rounds_since_update = [0]
 
         async def _conditional_rec_update():
             _rec_rounds_since_update[0] += 1
-            if _rec_rounds_since_update[0] >= rec_update_interval:
+            # Always run on first call (bootstrap feed), then every Nth
+            if _rec_rounds_since_update[0] == 1 or _rec_rounds_since_update[0] >= rec_update_interval:
                 await _original_rec_update()
-                _rec_rounds_since_update[0] = 0
+                if _rec_rounds_since_update[0] >= rec_update_interval:
+                    _rec_rounds_since_update[0] = 0
 
         result.env.platform.update_rec_table = _conditional_rec_update
-        log_info(f"Rec table update interval: every {rec_update_interval} rounds")
+        log_info(f"Rec table update interval: every {rec_update_interval} rounds ({agent_count} agents)")
 
     # AVM smart paging — evict all agents to stub state
     twitter_pager = None
@@ -1426,20 +1437,30 @@ async def run_reddit_simulation(
 
     log_info(f"环境已启动 (semaphore={llm_semaphore})")
 
-    # Conditional rec table update — skip unless N rounds have elapsed
-    rec_update_interval = config.get("rec_update_interval", 3)
+    # Conditional rec table update — scale interval with agent count
+    agent_count = len(config.get("agent_configs", []))
+    if config.get("rec_update_interval"):
+        rec_update_interval = config["rec_update_interval"]
+    elif agent_count > 50:
+        rec_update_interval = 15
+    elif agent_count > 20:
+        rec_update_interval = 10
+    else:
+        rec_update_interval = 5
+
     if rec_update_interval > 1 and hasattr(result.env, 'platform'):
         _original_rec_update = result.env.platform.update_rec_table
-        _rec_rounds_since_update = [0]  # mutable counter in closure
+        _rec_rounds_since_update = [0]
 
         async def _conditional_rec_update():
             _rec_rounds_since_update[0] += 1
-            if _rec_rounds_since_update[0] >= rec_update_interval:
+            if _rec_rounds_since_update[0] == 1 or _rec_rounds_since_update[0] >= rec_update_interval:
                 await _original_rec_update()
-                _rec_rounds_since_update[0] = 0
+                if _rec_rounds_since_update[0] >= rec_update_interval:
+                    _rec_rounds_since_update[0] = 0
 
         result.env.platform.update_rec_table = _conditional_rec_update
-        log_info(f"Rec table update interval: every {rec_update_interval} rounds")
+        log_info(f"Rec table update interval: every {rec_update_interval} rounds ({agent_count} agents)")
 
     # AVM smart paging — evict all agents to stub state
     reddit_pager = None
