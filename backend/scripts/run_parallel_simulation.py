@@ -1179,119 +1179,126 @@ async def run_twitter_simulation(
 
     log_info(f"环境已启动 (semaphore={llm_semaphore})")
 
-    # Replace OASIS's TWHIN-BERT rec table with SurrealDB HNSW vector feed
+    # SurrealDB HNSW vector feed — per-sim database, batched queries
     agent_count = len(config.get("agent_configs", []))
     _sim_id = config.get("simulation_id", "")
-    _surreal_storage = None
+    _vec_db = None
     _embedding_svc = None
     _last_embedded_post_id = [0]
+    _agent_embeddings = {}  # uid -> embedding (loaded once)
+    _vec_db_name = "vf_" + _sim_id.replace("-", "_") if _sim_id else ""
 
     if _avm_pager_available and _sim_id and hasattr(result.env, 'platform'):
         try:
-            _surreal_storage = get_storage()
+            _main_storage = get_storage()
             from app.storage.embedding_service import EmbeddingService
+            from surrealdb import Surreal
             _embedding_svc = EmbeddingService()
+
+            # Create per-sim database with HNSW index
+            _main_storage._query("DEFINE DATABASE " + _vec_db_name)
+            _vec_db = Surreal(_main_storage._url)
+            _vec_db.__enter__()
+            _vec_db.use(_main_storage._namespace, _vec_db_name)
+            _vec_db.signin({"username": _main_storage._user, "password": _main_storage._password})
+            _vec_db.query("DEFINE TABLE post SCHEMAFULL")
+            _vec_db.query("DEFINE FIELD post_id ON post TYPE int")
+            _vec_db.query("DEFINE FIELD content ON post TYPE string DEFAULT ''")
+            _vec_db.query("DEFINE FIELD embedding ON post TYPE array<float> DEFAULT []")
+            _vec_db.query("DEFINE INDEX idx_pid ON post FIELDS post_id UNIQUE")
+            _vec_db.query("DEFINE INDEX idx_vec ON post FIELDS embedding HNSW DIMENSION 768 DIST COSINE TYPE F32 EFC 150 M 12")
+
+            # Load agent persona embeddings once
+            rows = _main_storage._rows(_main_storage._query(
+                "SELECT agent_id, persona_embedding FROM agent WHERE simulation_id = $sid AND array::len(persona_embedding) > 0",
+                {"sid": _sim_id},
+            ))
+            for r in rows:
+                _agent_embeddings[r["agent_id"]] = r["persona_embedding"]
+            log_info(f"Vector feed: loaded {len(_agent_embeddings)} agent embeddings")
         except Exception as exc:
-            log_info(f"SurrealDB vector feed unavailable: {exc}")
-            _surreal_storage = None
+            log_info(f"Vector feed setup failed: {exc}")
+            _vec_db = None
 
     if hasattr(result.env, 'platform'):
         _platform = result.env.platform
         _max_rec = getattr(_platform, 'max_rec_post_len', 20)
 
         async def _vector_rec_update():
-            """SurrealDB HNSW vector feed.
-
-            1. Embed new posts since last update → store in sim_post table
-            2. For each agent, HNSW query for posts matching persona embedding
-            3. Write relevant post IDs to SQLite rec table
-            Falls back to recent posts if SurrealDB unavailable.
-            """
+            """Per-sim database HNSW vector feed with batched queries."""
             try:
                 cursor = _platform.db_cursor
 
-                # --- Embed new posts in background ---
-                if _surreal_storage and _embedding_svc:
+                # 1. Embed new posts → batch insert into per-sim DB
+                if _vec_db and _embedding_svc:
                     try:
                         cursor.execute(
-                            "SELECT post_id, user_id, content FROM post WHERE post_id > ? ORDER BY post_id",
+                            "SELECT post_id, content FROM post WHERE post_id > ? ORDER BY post_id",
                             (_last_embedded_post_id[0],),
                         )
-                        new_posts = cursor.fetchall()
+                        new_posts = [(r[0], r[1]) for r in cursor.fetchall() if r[1]]
                         if new_posts:
-                            contents = [p[2] for p in new_posts if p[2]]
-                            if contents:
-                                embeddings = _embedding_svc.embed_batch(contents)
-                                emb_idx = 0
-                                for post_id, user_id, content in new_posts:
-                                    if content and emb_idx < len(embeddings):
-                                        _surreal_storage._query(
-                                            """
-                                            UPSERT sim_post SET
-                                                simulation_id = $sid,
-                                                platform = $plat,
-                                                post_id = $pid,
-                                                user_id = $uid,
-                                                content = $content,
-                                                embedding = $emb,
-                                                created_at = time::now()
-                                            WHERE simulation_id = $sid
-                                              AND platform = $plat
-                                              AND post_id = $pid;
-                                            """,
-                                            {
-                                                "sid": _sim_id,
-                                                "plat": "twitter",
-                                                "pid": post_id,
-                                                "uid": user_id,
-                                                "content": content[:500],
-                                                "emb": embeddings[emb_idx],
-                                            },
-                                        )
-                                        emb_idx += 1
-                                _last_embedded_post_id[0] = new_posts[-1][0]
+                            contents = [p[1] for p in new_posts]
+                            embeddings = _embedding_svc.embed_batch(contents)
+                            for idx, (post_id, content) in enumerate(new_posts):
+                                if idx < len(embeddings):
+                                    _vec_db.query(
+                                        "CREATE post SET post_id = $pid, content = $c, embedding = $emb",
+                                        {"pid": post_id, "c": content[:500], "emb": embeddings[idx]},
+                                    )
+                            _last_embedded_post_id[0] = new_posts[-1][0]
                     except Exception as exc:
                         log_info(f"Post embedding error: {exc}")
 
-                # --- Build personalized feed per agent ---
+                # 2. Build personalized feed — batched HNSW queries
                 cursor.execute("SELECT user_id FROM user")
                 users = [r[0] for r in cursor.fetchall()]
-
                 cursor.execute("DELETE FROM rec")
                 insert_values = []
 
-                if _surreal_storage and _last_embedded_post_id[0] > 0:
-                    # HNSW vector feed — find posts matching each agent's persona
+                if _vec_db and _last_embedded_post_id[0] > 0 and _agent_embeddings:
+                    # Build batch query: one HNSW lookup per agent, all in one call
+                    batch_parts = []
+                    batch_users = []
                     for uid in users:
-                        try:
-                            rows = _surreal_storage._rows(_surreal_storage._query(
-                                """
-                                SELECT post_id
-                                FROM sim_post
-                                WHERE simulation_id = $sid AND platform = $plat
-                                  AND embedding <|$k,40|> (
-                                    SELECT VALUE persona_embedding
-                                    FROM agent
-                                    WHERE simulation_id = $sid AND agent_id = $uid
-                                    LIMIT 1
-                                  )[0]
-                                """,
-                                {"sid": _sim_id, "plat": "twitter", "uid": uid, "k": _max_rec},
-                            ))
-                            for r in rows:
-                                pid = r.get("post_id")
-                                if pid is not None:
-                                    insert_values.append((uid, pid))
-                        except Exception:
-                            # Fallback: give this user recent posts
-                            cursor.execute(
-                                "SELECT post_id FROM post ORDER BY created_at DESC LIMIT ?",
-                                (_max_rec,),
+                        emb = _agent_embeddings.get(uid)
+                        if emb:
+                            batch_parts.append(
+                                "SELECT post_id, vector::distance::knn() AS dist FROM post WHERE embedding <|"
+                                + str(_max_rec) + ",40|> $emb_" + str(uid)
                             )
-                            for r in cursor.fetchall():
-                                insert_values.append((uid, r[0]))
-                else:
-                    # Fallback: no embeddings yet, use recent posts
+                            batch_users.append(uid)
+
+                    if batch_parts:
+                        # Execute all HNSW queries in one network call
+                        batch_query = "; ".join(batch_parts)
+                        params = {}
+                        for uid in batch_users:
+                            params["emb_" + str(uid)] = _agent_embeddings[uid]
+
+                        try:
+                            results = _vec_db.query(batch_query, params)
+                            # results is a list of result sets, one per query
+                            if isinstance(results, list) and len(results) == len(batch_users):
+                                for i, uid in enumerate(batch_users):
+                                    rows = results[i] if isinstance(results[i], list) else [results[i]]
+                                    for r in rows:
+                                        pid = r.get("post_id") if isinstance(r, dict) else None
+                                        if pid is not None:
+                                            insert_values.append((uid, pid))
+                            else:
+                                # Single result or unexpected format — parse all rows
+                                if isinstance(results, list):
+                                    for r in results:
+                                        if isinstance(r, dict) and r.get("post_id") is not None:
+                                            # Can't determine which user, give to all
+                                            for uid in users:
+                                                insert_values.append((uid, r["post_id"]))
+                        except Exception as exc:
+                            log_info(f"Batch HNSW error: {exc}")
+
+                # 3. Fallback: recent posts if no vector results
+                if not insert_values:
                     cursor.execute(
                         "SELECT post_id FROM post ORDER BY created_at DESC LIMIT ?",
                         (min(200, _max_rec * 3),),
@@ -1299,8 +1306,7 @@ async def run_twitter_simulation(
                     all_posts = [r[0] for r in cursor.fetchall()]
                     if all_posts:
                         for uid in users:
-                            recent = all_posts[:_max_rec]
-                            for pid in recent:
+                            for pid in all_posts[:_max_rec]:
                                 insert_values.append((uid, pid))
 
                 if insert_values:
@@ -1311,10 +1317,10 @@ async def run_twitter_simulation(
                     cursor.connection.commit()
 
             except Exception as exc:
-                log_info(f"Vector rec update error: {exc}")
+                log_info(f"Vector rec error: {exc}")
 
         _platform.update_rec_table = _vector_rec_update
-        log_info(f"SurrealDB vector feed enabled ({agent_count} agents, max_rec={_max_rec})")
+        log_info(f"Vector feed enabled ({agent_count} agents, db={_vec_db_name})")
 
     # AVM smart paging — evict all agents to stub state
     twitter_pager = None
@@ -1475,6 +1481,14 @@ async def run_twitter_simulation(
     elapsed = (datetime.now() - start_time).total_seconds()
     log_info(f"模拟循环完成! 耗时: {elapsed:.1f}秒, 总动作: {total_actions}")
 
+    # Cleanup: drop per-sim vector feed database
+    if _vec_db and _vec_db_name:
+        try:
+            _main_storage._query("REMOVE DATABASE " + _vec_db_name)
+            log_info(f"Dropped vector feed db: {_vec_db_name}")
+        except Exception:
+            pass
+
     return result
 
 
@@ -1562,20 +1576,44 @@ async def run_reddit_simulation(
 
     log_info(f"环境已启动 (semaphore={llm_semaphore})")
 
-    # Replace OASIS's rec table with SurrealDB HNSW vector feed
+    # SurrealDB HNSW vector feed — per-sim database, batched queries (Reddit)
     agent_count = len(config.get("agent_configs", []))
     _sim_id_r = config.get("simulation_id", "")
-    _surreal_storage_r = None
+    _vec_db_r = None
     _embedding_svc_r = None
     _last_embedded_post_id_r = [0]
+    _agent_embeddings_r = {}
+    _vec_db_name_r = "vf_" + _sim_id_r.replace("-", "_") + "_rd" if _sim_id_r else ""
 
     if _avm_pager_available and _sim_id_r and hasattr(result.env, 'platform'):
         try:
-            _surreal_storage_r = get_storage()
+            _main_storage_r = get_storage()
             from app.storage.embedding_service import EmbeddingService
+            from surrealdb import Surreal
             _embedding_svc_r = EmbeddingService()
-        except Exception:
-            _surreal_storage_r = None
+
+            _main_storage_r._query("DEFINE DATABASE " + _vec_db_name_r)
+            _vec_db_r = Surreal(_main_storage_r._url)
+            _vec_db_r.__enter__()
+            _vec_db_r.use(_main_storage_r._namespace, _vec_db_name_r)
+            _vec_db_r.signin({"username": _main_storage_r._user, "password": _main_storage_r._password})
+            _vec_db_r.query("DEFINE TABLE post SCHEMAFULL")
+            _vec_db_r.query("DEFINE FIELD post_id ON post TYPE int")
+            _vec_db_r.query("DEFINE FIELD content ON post TYPE string DEFAULT ''")
+            _vec_db_r.query("DEFINE FIELD embedding ON post TYPE array<float> DEFAULT []")
+            _vec_db_r.query("DEFINE INDEX idx_pid ON post FIELDS post_id UNIQUE")
+            _vec_db_r.query("DEFINE INDEX idx_vec ON post FIELDS embedding HNSW DIMENSION 768 DIST COSINE TYPE F32 EFC 150 M 12")
+
+            rows = _main_storage_r._rows(_main_storage_r._query(
+                "SELECT agent_id, persona_embedding FROM agent WHERE simulation_id = $sid AND array::len(persona_embedding) > 0",
+                {"sid": _sim_id_r},
+            ))
+            for r in rows:
+                _agent_embeddings_r[r["agent_id"]] = r["persona_embedding"]
+            log_info(f"Vector feed: loaded {len(_agent_embeddings_r)} agent embeddings")
+        except Exception as exc:
+            log_info(f"Vector feed setup failed: {exc}")
+            _vec_db_r = None
 
     if hasattr(result.env, 'platform'):
         _platform = result.env.platform
@@ -1585,45 +1623,23 @@ async def run_reddit_simulation(
             try:
                 cursor = _platform.db_cursor
 
-                if _surreal_storage_r and _embedding_svc_r:
+                if _vec_db_r and _embedding_svc_r:
                     try:
                         cursor.execute(
-                            "SELECT post_id, user_id, content FROM post WHERE post_id > ? ORDER BY post_id",
+                            "SELECT post_id, content FROM post WHERE post_id > ? ORDER BY post_id",
                             (_last_embedded_post_id_r[0],),
                         )
-                        new_posts = cursor.fetchall()
+                        new_posts = [(r[0], r[1]) for r in cursor.fetchall() if r[1]]
                         if new_posts:
-                            contents = [p[2] for p in new_posts if p[2]]
-                            if contents:
-                                embeddings = _embedding_svc_r.embed_batch(contents)
-                                emb_idx = 0
-                                for post_id, user_id, content in new_posts:
-                                    if content and emb_idx < len(embeddings):
-                                        _surreal_storage_r._query(
-                                            """
-                                            UPSERT sim_post SET
-                                                simulation_id = $sid,
-                                                platform = $plat,
-                                                post_id = $pid,
-                                                user_id = $uid,
-                                                content = $content,
-                                                embedding = $emb,
-                                                created_at = time::now()
-                                            WHERE simulation_id = $sid
-                                              AND platform = $plat
-                                              AND post_id = $pid;
-                                            """,
-                                            {
-                                                "sid": _sim_id_r,
-                                                "plat": "reddit",
-                                                "pid": post_id,
-                                                "uid": user_id,
-                                                "content": content[:500],
-                                                "emb": embeddings[emb_idx],
-                                            },
-                                        )
-                                        emb_idx += 1
-                                _last_embedded_post_id_r[0] = new_posts[-1][0]
+                            contents = [p[1] for p in new_posts]
+                            embeddings = _embedding_svc_r.embed_batch(contents)
+                            for idx, (post_id, content) in enumerate(new_posts):
+                                if idx < len(embeddings):
+                                    _vec_db_r.query(
+                                        "CREATE post SET post_id = $pid, content = $c, embedding = $emb",
+                                        {"pid": post_id, "c": content[:500], "emb": embeddings[idx]},
+                                    )
+                            _last_embedded_post_id_r[0] = new_posts[-1][0]
                     except Exception as exc:
                         log_info(f"Reddit post embedding error: {exc}")
 
@@ -1632,35 +1648,43 @@ async def run_reddit_simulation(
                 cursor.execute("DELETE FROM rec")
                 insert_values = []
 
-                if _surreal_storage_r and _last_embedded_post_id_r[0] > 0:
+                if _vec_db_r and _last_embedded_post_id_r[0] > 0 and _agent_embeddings_r:
+                    batch_parts = []
+                    batch_users = []
                     for uid in users:
-                        try:
-                            rows = _surreal_storage_r._rows(_surreal_storage_r._query(
-                                """
-                                SELECT post_id
-                                FROM sim_post
-                                WHERE simulation_id = $sid AND platform = $plat
-                                  AND embedding <|$k,40|> (
-                                    SELECT VALUE persona_embedding
-                                    FROM agent
-                                    WHERE simulation_id = $sid AND agent_id = $uid
-                                    LIMIT 1
-                                  )[0]
-                                """,
-                                {"sid": _sim_id_r, "plat": "reddit", "uid": uid, "k": _max_rec},
-                            ))
-                            for r in rows:
-                                pid = r.get("post_id")
-                                if pid is not None:
-                                    insert_values.append((uid, pid))
-                        except Exception:
-                            cursor.execute(
-                                "SELECT post_id FROM post ORDER BY created_at DESC LIMIT ?",
-                                (_max_rec,),
+                        emb = _agent_embeddings_r.get(uid)
+                        if emb:
+                            batch_parts.append(
+                                "SELECT post_id, vector::distance::knn() AS dist FROM post WHERE embedding <|"
+                                + str(_max_rec) + ",40|> $emb_" + str(uid)
                             )
-                            for r in cursor.fetchall():
-                                insert_values.append((uid, r[0]))
-                else:
+                            batch_users.append(uid)
+
+                    if batch_parts:
+                        batch_query = "; ".join(batch_parts)
+                        params = {}
+                        for uid in batch_users:
+                            params["emb_" + str(uid)] = _agent_embeddings_r[uid]
+
+                        try:
+                            results = _vec_db_r.query(batch_query, params)
+                            if isinstance(results, list) and len(results) == len(batch_users):
+                                for i, uid in enumerate(batch_users):
+                                    rows = results[i] if isinstance(results[i], list) else [results[i]]
+                                    for r in rows:
+                                        pid = r.get("post_id") if isinstance(r, dict) else None
+                                        if pid is not None:
+                                            insert_values.append((uid, pid))
+                            else:
+                                if isinstance(results, list):
+                                    for r in results:
+                                        if isinstance(r, dict) and r.get("post_id") is not None:
+                                            for uid in users:
+                                                insert_values.append((uid, r["post_id"]))
+                        except Exception as exc:
+                            log_info(f"Reddit batch HNSW error: {exc}")
+
+                if not insert_values:
                     cursor.execute(
                         "SELECT post_id FROM post ORDER BY created_at DESC LIMIT ?",
                         (min(200, _max_rec * 3),),
@@ -1679,10 +1703,10 @@ async def run_reddit_simulation(
                     cursor.connection.commit()
 
             except Exception as exc:
-                log_info(f"Reddit vector rec update error: {exc}")
+                log_info(f"Reddit vector rec error: {exc}")
 
         _platform.update_rec_table = _vector_rec_update_reddit
-        log_info(f"SurrealDB vector feed enabled ({agent_count} agents, max_rec={_max_rec})")
+        log_info(f"Vector feed enabled ({agent_count} agents, db={_vec_db_name_r})")
 
     # AVM smart paging — evict all agents to stub state
     reddit_pager = None
@@ -1850,6 +1874,14 @@ async def run_reddit_simulation(
     result.total_actions = total_actions
     elapsed = (datetime.now() - start_time).total_seconds()
     log_info(f"模拟循环完成! 耗时: {elapsed:.1f}秒, 总动作: {total_actions}")
+
+    # Cleanup: drop per-sim vector feed database
+    if _vec_db_r and _vec_db_name_r:
+        try:
+            _main_storage_r._query("REMOVE DATABASE " + _vec_db_name_r)
+            log_info(f"Dropped vector feed db: {_vec_db_name_r}")
+        except Exception:
+            pass
 
     return result
 
