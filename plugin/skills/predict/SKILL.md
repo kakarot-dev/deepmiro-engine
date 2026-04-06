@@ -2,110 +2,139 @@
 name: predict
 description: Run a DeepMiro swarm prediction — multi-agent social media simulation that predicts how communities react to events, policies, or announcements. Use when the user says "predict", "simulate", "how will people react", "what would happen if", or wants to model social dynamics.
 argument-hint: [scenario] [optional-file-path]
+disable-model-invocation: true
 ---
 
 # DeepMiro Predict
 
-Run a multi-agent swarm simulation to predict how online communities react to a scenario. Agents with distinct personas (students, journalists, officials, alumni) interact on simulated Twitter and Reddit, producing realistic social media dynamics.
+## Step 0: Setup Check (MUST run first)
 
-## Setup Check (MUST run before anything else)
+Check if the `create_simulation` MCP tool exists and is callable.
 
-Before doing ANY work, call `list_simulations` with `limit: 1` as a connectivity test.
+**If tools ARE available:** Skip to Step 1.
 
-**If it succeeds** (returns a list, even empty): connection is valid, proceed to workflow.
+**If tools are NOT available (MCP disconnected):**
 
-**If it fails with auth/401 error:**
-> "DeepMiro needs an API key to connect. Two options:
-> 1. **Hosted** (recommended): Sign up at https://deepmiro.org → get your API key → then run:
->    `export DEEPMIRO_API_KEY=dm_your_key_here`
->    and restart Claude Code.
-> 2. **Self-hosted**: Run `docker compose up` from the deepmiro repo and update the plugin's `.mcp.json` URL to `http://localhost:3001/mcp` (no auth needed)."
+Ask the user:
+> "DeepMiro isn't connected yet. Choose one:
+> 1. **Hosted** — paste your API key from https://deepmiro.org
+> 2. **Self-hosted** — I'll point to your local instance
+> 3. **Manual** — I'll give you the commands to run yourself"
 
-**Stop here if auth fails.** Do not proceed with the workflow.
+Then wait for their response.
 
-**If it fails with connection error** (not auth):
-> "Can't reach the DeepMiro server. Check that:
-> - Your API key is valid (`DEEPMIRO_API_KEY` environment variable)
-> - The server is running (if self-hosted: `docker compose up`)
-> - Your network can reach deepmiro.org"
+### Auto-setup (if user provides API key or says self-hosted)
 
-**Stop here if connection fails.**
+**If they provide an API key:**
 
-## Arguments
+Try to run:
+```bash
+claude mcp add deepmiro --transport http https://deepmiro.org/mcp -e DEEPMIRO_API_KEY=<their_key>
+```
 
-$ARGUMENTS contains the prediction prompt and optionally a file path.
+Also try to install the standalone `/predict` skill:
+```bash
+mkdir -p ~/.claude/skills/predict
+```
+Then copy this skill's workflow section to `~/.claude/skills/predict/SKILL.md`.
+
+**If they say self-hosted:**
+
+Ask for URL (default `http://localhost:3001/mcp`), then:
+```bash
+claude mcp add deepmiro --transport http <url>
+```
+
+### If user denies permissions or chooses manual:
+
+Give them the commands to run themselves:
+> "Run these in your terminal:
+> ```
+> claude mcp add deepmiro --transport http https://deepmiro.org/mcp -e DEEPMIRO_API_KEY=dm_your_key
+> ```
+> Then restart Claude Code. After that, `/deepmiro:predict` will work."
+>
+> For self-hosted:
+> ```
+> claude mcp add deepmiro --transport http http://localhost:3001/mcp
+> ```
+
+### After any setup path:
+
+Tell user: "Restart Claude Code for the connection to activate. Then use `/predict` (or `/deepmiro:predict`) to run simulations."
+
+**Stop here after setup. Do not proceed with the workflow until MCP is connected.**
+
+---
+
+## Step 1: Connectivity Test
+
+Call `list_simulations` with `limit: 1` to verify the connection.
+
+- **Success (returns list):** Proceed.
+- **Auth/401 error:** Go back to Step 0 setup flow.
+- **Connection error:** "Can't reach DeepMiro. Check your API key and network."
+
+---
 
 ## Workflow
 
-### Step 1: Upload document (if applicable)
+### Step 2: Upload document (if applicable)
 
-If the user provided a file path in $ARGUMENTS, or referenced a file earlier in the conversation (PDF, MD, TXT):
-
+If the user provided a file path in $ARGUMENTS or referenced a file earlier:
 1. Call `upload_document` with the file path
-2. Save the returned `document_id`
-3. Tell the user: "Uploaded your document — I'll use it to seed the knowledge graph."
+2. Save `document_id`
+3. "Uploaded your document — using it to build the knowledge graph."
 
-If no file, skip to Step 2.
+No file? Skip to Step 3.
 
-### Step 2: Choose preset
+### Step 3: Choose preset
 
-- **"quick"** — 10 agents, 20 rounds. Use when user says "quick", "fast", or "just a rough idea"
-- **"standard"** (default) — 20 agents, 40 rounds. Use for most predictions
-- **"deep"** — 50 agents, 72 rounds. Use when user says "deep", "thorough", "detailed", or provides a long document
+- **"quick"** — user said "quick", "fast", "rough idea"
+- **"standard"** (default) — most predictions
+- **"deep"** — user said "deep", "thorough", or provided a large document
 
-If the user uploaded a large PDF, suggest deep: "This is a detailed document — I'll run a deep simulation with more agents for a thorough analysis."
+### Step 4: Create simulation
 
-### Step 3: Create simulation
+Call `create_simulation` with prompt, document_id (optional), preset.
 
-Call `create_simulation`:
-- `prompt`: The scenario from $ARGUMENTS
-- `document_id`: From Step 1 (if applicable)
-- `preset`: From Step 2
+> "Simulation started. I'll narrate as the personas interact — you can keep working."
 
-Save the `simulation_id`. Tell the user:
+### Step 5: Monitor and narrate
 
-> "Simulation started. I'll narrate what happens as the personas interact. You can keep working — I'll update you as it progresses."
-
-### Step 4: Monitor and narrate
-
-Poll `simulation_status` every 30 seconds. Narrate naturally based on the `phase`:
+Poll `simulation_status` every 30 seconds. Narrate naturally based on `phase`:
 
 **building_graph:**
-> "Building a knowledge graph from your input... extracting entities and relationships."
+> "Building knowledge graph... {progress}%"
 
 **generating_profiles:**
-> "Creating personas: 24 of 68 ready so far — Li Wei (Student), Prof. Zhang (Faculty), Campus Daily (Media)..."
+> "Creating personas: {profiles_generated}/{entities_count} — {recent_profiles}"
 
 **simulating:**
-Narrate the simulation like a story using entity names and action content:
-> "Round 15/40 — 127 interactions so far.
-> Prof. Zhang just tweeted: 'Our research output this semester shows remarkable growth in interdisciplinary collaboration...'
-> Li Wei liked the post. Chongqing Upstream News is discussing the campus food controversy on Reddit."
+Use entity names and action content:
+> "Round 15/40 — 127 interactions. Prof. Zhang tweeted: 'Our research output shows remarkable growth...' Li Wei liked it."
 
-**completed:**
-Move to Step 5.
+**completed:** Move to Step 6.
 
-If the simulation takes more than 15 minutes, tell the user: "This deep simulation is still running — I'll let you know when it's done. Feel free to keep working."
+If over 15 minutes: "Still running — I'll notify you when done."
 
-### Step 5: Present report
+### Step 6: Present report
 
-Call `get_report` with the simulation_id. Present the full analysis.
+Call `get_report`. Present the analysis. Then offer:
+> "Want me to:
+> - **Interview a persona** about their motivations
+> - **Run a different scenario**
+> - **Search past simulations**"
 
-Then offer:
-> "The simulation is complete. Want me to:
-> - **Interview a persona** — ask any simulated character about their motivations
-> - **Run a different scenario** — modify the prompt and simulate again
-> - **Search past simulations** — find previous predictions"
+### Step 7: Interview (optional)
 
-### Step 6: Interview (optional)
+Call `interview_agent` with simulation_id, agent name, and user's question.
 
-If the user wants to interview a persona:
-1. Call `interview_agent` with the simulation_id, agent name/ID, and the user's question
-2. Present the response in character
+---
 
 ## Rules
 
-- **Names, not IDs**: Always use entity names ("Prof. Zhang", "Li Wei"). Never show "Agent_34" or "agent_id: 7".
-- **No base64**: Never use the `files` parameter on `create_simulation`. Always `upload_document` first.
-- **Error recovery**: If the simulation fails, offer to retry with a smaller preset or prompt-only (no document).
-- **Quick predict**: If the user just wants a fast opinion without a full simulation, use `quick_predict` instead and mention that a full simulation is available for deeper analysis.
+- **Names not IDs** — "Prof. Zhang" not "Agent_34"
+- **No base64** — always `upload_document` first, pass `document_id`
+- **Error recovery** — if sim fails, retry with smaller preset
+- **Quick predict** — for fast opinions use `quick_predict`, mention full sim is available
