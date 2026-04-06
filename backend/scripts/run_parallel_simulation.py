@@ -77,6 +77,8 @@ import warnings
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
 
+import numpy as np
+
 
 # 全局变量：用于信号处理
 _shutdown_event = None
@@ -182,6 +184,39 @@ except ImportError as e:
     print(f"错误: 缺少依赖 {e}")
     print("请先安装: pip install oasis-ai camel-ai")
     sys.exit(1)
+
+
+# ── Cached TWHIN-BERT singleton ──────────────────────────────────
+_twhin_model = None
+_twhin_tokenizer = None
+
+
+def _get_twhin_bert():
+    """Lazy-load TWHIN-BERT model and tokenizer (singleton, ~2s first call)."""
+    global _twhin_model, _twhin_tokenizer
+    if _twhin_model is None:
+        import torch
+        from transformers import AutoModel, AutoTokenizer
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        _twhin_tokenizer = AutoTokenizer.from_pretrained(
+            "Twitter/twhin-bert-base", model_max_length=512
+        )
+        _twhin_model = AutoModel.from_pretrained(
+            "Twitter/twhin-bert-base"
+        ).to(device).eval()
+    return _twhin_model, _twhin_tokenizer
+
+
+def _twhin_embed(texts: list) -> np.ndarray:
+    """Embed texts with TWHIN-BERT. Returns (N, 768) float32 numpy array."""
+    import torch
+    model, tokenizer = _get_twhin_bert()
+    device = next(model.parameters()).device
+    with torch.no_grad():
+        inputs = tokenizer(texts, return_tensors="pt", padding=True, truncation=True)
+        inputs = {k: v.to(device) for k, v in inputs.items()}
+        outputs = model(**inputs)
+    return outputs.pooler_output.cpu().numpy()
 
 
 # Twitter可用动作（不包含INTERVIEW，INTERVIEW只能通过ManualAction手动触发）
@@ -1179,159 +1214,84 @@ async def run_twitter_simulation(
 
     log_info(f"环境已启动 (semaphore={llm_semaphore})")
 
-    # SurrealDB HNSW vector feed — per-sim database, batched queries
-    agent_count = len(config.get("agent_configs", []))
-    _sim_id = config.get("simulation_id", "")
-    _vec_db = None
-    _embedding_svc = None
-    _last_embedded_post_id = [0]
-    _agent_embeddings = {}  # uid -> embedding (loaded once)
-    _vec_db_name = "vf_" + _sim_id.replace("-", "_") if _sim_id else ""
-
-    if _avm_pager_available and _sim_id and hasattr(result.env, 'platform'):
-        try:
-            _main_storage = get_storage()
-            from app.storage.embedding_service import EmbeddingService
-            from surrealdb import Surreal
-            _embedding_svc = EmbeddingService()
-
-            # Create per-sim database with HNSW index
-            _main_storage._query("DEFINE DATABASE " + _vec_db_name)
-            _vec_db = Surreal(_main_storage._url)
-            _vec_db.__enter__()
-            _vec_db.use(_main_storage._namespace, _vec_db_name)
-            _vec_db.signin({"username": _main_storage._user, "password": _main_storage._password})
-            _vec_db.query("DEFINE TABLE post SCHEMAFULL")
-            _vec_db.query("DEFINE FIELD post_id ON post TYPE int")
-            _vec_db.query("DEFINE FIELD content ON post TYPE string DEFAULT ''")
-            _vec_db.query("DEFINE FIELD embedding ON post TYPE array<float> DEFAULT []")
-            _vec_db.query("DEFINE INDEX idx_pid ON post FIELDS post_id UNIQUE")
-            _vec_db.query("DEFINE INDEX idx_vec ON post FIELDS embedding HNSW DIMENSION 768 DIST COSINE TYPE F32 EFC 150 M 12")
-
-            # Copy agent persona embeddings into per-sim DB (avoids sending them over wire each round)
-            _vec_db.query("DEFINE TABLE agent SCHEMAFULL")
-            _vec_db.query("DEFINE FIELD agent_id ON agent TYPE int")
-            _vec_db.query("DEFINE FIELD embedding ON agent TYPE array<float> DEFAULT []")
-            _vec_db.query("DEFINE INDEX idx_aid ON agent FIELDS agent_id UNIQUE")
-
-            rows = _main_storage._rows(_main_storage._query(
-                "SELECT agent_id, persona_embedding FROM agent WHERE simulation_id = $sid AND array::len(persona_embedding) > 0",
-                {"sid": _sim_id},
-            ))
-            # Batch insert all agent embeddings in one call
-            agent_inserts = []
-            agent_params = {}
-            for r in rows:
-                aid = r["agent_id"]
-                _agent_embeddings[aid] = True  # just track which agents have embeddings
-                agent_inserts.append(f"CREATE agent SET agent_id = $a_{aid}, embedding = $e_{aid}")
-                agent_params[f"a_{aid}"] = aid
-                agent_params[f"e_{aid}"] = r["persona_embedding"]
-            if agent_inserts:
-                _vec_db.query("; ".join(agent_inserts), agent_params)
-            log_info(f"Vector feed: copied {len(agent_inserts)} agent embeddings to per-sim DB")
-        except Exception as exc:
-            log_info(f"Vector feed setup failed: {exc}")
-            _vec_db = None
+    # ── Cached TWHIN-BERT rec system (Twitter) ────────────────────
+    _last_embedded_post_id_tw = [0]
+    _user_embeddings_tw = [None]
+    _post_embeddings_tw = [None]
+    _post_ids_tw = []
+    _user_ids_tw = []
 
     if hasattr(result.env, 'platform'):
         _platform = result.env.platform
         _max_rec = getattr(_platform, 'max_rec_post_len', 20)
 
-        async def _vector_rec_update():
-            """Per-sim database HNSW vector feed — zero embedding data over wire per round."""
+        async def _twhin_rec_update():
+            """Cached TWHIN-BERT: embed users once, new posts incrementally, numpy similarity."""
             try:
                 cursor = _platform.db_cursor
 
-                # 1. Embed new posts → batch insert into per-sim DB
-                if _vec_db and _embedding_svc:
-                    try:
-                        cursor.execute(
-                            "SELECT post_id, content FROM post WHERE post_id > ? ORDER BY post_id",
-                            (_last_embedded_post_id[0],),
-                        )
-                        new_posts = [(r[0], r[1]) for r in cursor.fetchall() if r[1]]
-                        if new_posts:
-                            contents = [p[1] for p in new_posts]
-                            embeddings = _embedding_svc.embed_batch(contents)
-                            batch_inserts = []
-                            batch_params = {}
-                            for idx, (post_id, content) in enumerate(new_posts):
-                                if idx < len(embeddings):
-                                    batch_inserts.append(
-                                        f"CREATE post SET post_id = $pid_{idx}, content = $c_{idx}, embedding = $emb_{idx}"
-                                    )
-                                    batch_params[f"pid_{idx}"] = post_id
-                                    batch_params[f"c_{idx}"] = content[:500]
-                                    batch_params[f"emb_{idx}"] = embeddings[idx]
-                            if batch_inserts:
-                                _vec_db.query("; ".join(batch_inserts), batch_params)
-                            _last_embedded_post_id[0] = new_posts[-1][0]
-                    except Exception as exc:
-                        log_info(f"Post embedding error: {exc}")
+                # 1. One-time: embed all user bios
+                if _user_embeddings_tw[0] is None:
+                    cursor.execute("SELECT user_id, bio FROM user ORDER BY user_id")
+                    rows = cursor.fetchall()
+                    _user_ids_tw.clear()
+                    bios = []
+                    for uid, bio in rows:
+                        _user_ids_tw.append(uid)
+                        bios.append(bio if bio else "user")
+                    if bios:
+                        _user_embeddings_tw[0] = _twhin_embed(bios)
+                        log_info(f"TWHIN rec: embedded {len(bios)} users")
 
-                # 2. Build personalized feed — HNSW queries referencing stored embeddings
-                cursor.execute("SELECT user_id FROM user")
-                users = [r[0] for r in cursor.fetchall()]
+                # 2. Embed only new posts
+                cursor.execute(
+                    "SELECT post_id, content FROM post WHERE post_id > ? ORDER BY post_id",
+                    (_last_embedded_post_id_tw[0],),
+                )
+                new_posts = [(pid, c) for pid, c in cursor.fetchall() if c]
+                if new_posts:
+                    new_ids = [p[0] for p in new_posts]
+                    new_vecs = _twhin_embed([p[1] for p in new_posts])
+                    _post_ids_tw.extend(new_ids)
+                    if _post_embeddings_tw[0] is None:
+                        _post_embeddings_tw[0] = new_vecs
+                    else:
+                        _post_embeddings_tw[0] = np.vstack([_post_embeddings_tw[0], new_vecs])
+                    _last_embedded_post_id_tw[0] = new_ids[-1]
+
+                # 3. Compute similarity & build rec table
                 cursor.execute("DELETE FROM rec")
                 insert_values = []
 
-                if _vec_db and _last_embedded_post_id[0] > 0 and _agent_embeddings:
-                    # Build batch query: each HNSW lookup reads its embedding from the agent table
-                    # No embedding data sent over wire — SurrealDB reads it internally
-                    batch_parts = []
-                    batch_users = []
-                    for uid in users:
-                        if _agent_embeddings.get(uid):
-                            batch_parts.append(
-                                "SELECT post_id, vector::distance::knn() AS dist FROM post "
-                                "WHERE embedding <|" + str(_max_rec) + ",40|> "
-                                "(SELECT VALUE embedding FROM agent WHERE agent_id = " + str(uid) + " LIMIT 1)[0]"
-                            )
-                            batch_users.append(uid)
+                u = _user_embeddings_tw[0]
+                p = _post_embeddings_tw[0]
+                if u is not None and p is not None and len(p) > 0 and len(u) > 0:
+                    u_norm = u / (np.linalg.norm(u, axis=1, keepdims=True) + 1e-8)
+                    p_norm = p / (np.linalg.norm(p, axis=1, keepdims=True) + 1e-8)
+                    sim = u_norm @ p_norm.T
+                    k = min(_max_rec, sim.shape[1])
+                    top_k = np.argpartition(-sim, k, axis=1)[:, :k]
+                    for i, uid in enumerate(_user_ids_tw):
+                        for j in top_k[i]:
+                            insert_values.append((uid, _post_ids_tw[j]))
 
-                    if batch_parts:
-                        try:
-                            results = _vec_db.query("; ".join(batch_parts))
-                            if isinstance(results, list) and len(results) == len(batch_users):
-                                for i, uid in enumerate(batch_users):
-                                    rows = results[i] if isinstance(results[i], list) else [results[i]]
-                                    for r in rows:
-                                        pid = r.get("post_id") if isinstance(r, dict) else None
-                                        if pid is not None:
-                                            insert_values.append((uid, pid))
-                            elif isinstance(results, list):
-                                for r in results:
-                                    if isinstance(r, dict) and r.get("post_id") is not None:
-                                        for uid in users:
-                                            insert_values.append((uid, r["post_id"]))
-                        except Exception as exc:
-                            log_info(f"Batch HNSW error: {exc}")
-
-                # 3. Fallback: recent posts if no vector results
                 if not insert_values:
-                    cursor.execute(
-                        "SELECT post_id FROM post ORDER BY created_at DESC LIMIT ?",
-                        (min(200, _max_rec * 3),),
-                    )
+                    cursor.execute("SELECT post_id FROM post ORDER BY created_at DESC LIMIT ?", (min(200, _max_rec * 3),))
                     all_posts = [r[0] for r in cursor.fetchall()]
                     if all_posts:
-                        for uid in users:
+                        cursor.execute("SELECT user_id FROM user")
+                        for uid, in cursor.fetchall():
                             for pid in all_posts[:_max_rec]:
                                 insert_values.append((uid, pid))
 
                 if insert_values:
-                    cursor.executemany(
-                        "INSERT INTO rec (user_id, post_id) VALUES (?, ?)",
-                        insert_values,
-                    )
+                    cursor.executemany("INSERT INTO rec (user_id, post_id) VALUES (?, ?)", insert_values)
                     cursor.connection.commit()
-
             except Exception as exc:
-                log_info(f"Vector rec error: {exc}")
+                log_info(f"TWHIN rec error: {exc}")
 
-        _platform.update_rec_table = _vector_rec_update
-        log_info(f"Vector feed enabled ({agent_count} agents, db={_vec_db_name})")
+        _platform.update_rec_table = _twhin_rec_update
+        log_info("TWHIN-BERT cached rec enabled")
 
     # AVM smart paging — evict all agents to stub state
     twitter_pager = None
@@ -1492,14 +1452,6 @@ async def run_twitter_simulation(
     elapsed = (datetime.now() - start_time).total_seconds()
     log_info(f"模拟循环完成! 耗时: {elapsed:.1f}秒, 总动作: {total_actions}")
 
-    # Cleanup: drop per-sim vector feed database
-    if _vec_db and _vec_db_name:
-        try:
-            _main_storage._query("REMOVE DATABASE " + _vec_db_name)
-            log_info(f"Dropped vector feed db: {_vec_db_name}")
-        except Exception:
-            pass
-
     return result
 
 
@@ -1587,151 +1539,81 @@ async def run_reddit_simulation(
 
     log_info(f"环境已启动 (semaphore={llm_semaphore})")
 
-    # SurrealDB HNSW vector feed — per-sim database, batched queries (Reddit)
-    agent_count = len(config.get("agent_configs", []))
-    _sim_id_r = config.get("simulation_id", "")
-    _vec_db_r = None
-    _embedding_svc_r = None
-    _last_embedded_post_id_r = [0]
-    _agent_embeddings_r = {}
-    _vec_db_name_r = "vf_" + _sim_id_r.replace("-", "_") + "_rd" if _sim_id_r else ""
-
-    if _avm_pager_available and _sim_id_r and hasattr(result.env, 'platform'):
-        try:
-            _main_storage_r = get_storage()
-            from app.storage.embedding_service import EmbeddingService
-            from surrealdb import Surreal
-            _embedding_svc_r = EmbeddingService()
-
-            _main_storage_r._query("DEFINE DATABASE " + _vec_db_name_r)
-            _vec_db_r = Surreal(_main_storage_r._url)
-            _vec_db_r.__enter__()
-            _vec_db_r.use(_main_storage_r._namespace, _vec_db_name_r)
-            _vec_db_r.signin({"username": _main_storage_r._user, "password": _main_storage_r._password})
-            _vec_db_r.query("DEFINE TABLE post SCHEMAFULL")
-            _vec_db_r.query("DEFINE FIELD post_id ON post TYPE int")
-            _vec_db_r.query("DEFINE FIELD content ON post TYPE string DEFAULT ''")
-            _vec_db_r.query("DEFINE FIELD embedding ON post TYPE array<float> DEFAULT []")
-            _vec_db_r.query("DEFINE INDEX idx_pid ON post FIELDS post_id UNIQUE")
-            _vec_db_r.query("DEFINE INDEX idx_vec ON post FIELDS embedding HNSW DIMENSION 768 DIST COSINE TYPE F32 EFC 150 M 12")
-
-            # Copy agent persona embeddings into per-sim DB
-            _vec_db_r.query("DEFINE TABLE agent SCHEMAFULL")
-            _vec_db_r.query("DEFINE FIELD agent_id ON agent TYPE int")
-            _vec_db_r.query("DEFINE FIELD embedding ON agent TYPE array<float> DEFAULT []")
-            _vec_db_r.query("DEFINE INDEX idx_aid ON agent FIELDS agent_id UNIQUE")
-
-            rows = _main_storage_r._rows(_main_storage_r._query(
-                "SELECT agent_id, persona_embedding FROM agent WHERE simulation_id = $sid AND array::len(persona_embedding) > 0",
-                {"sid": _sim_id_r},
-            ))
-            agent_inserts = []
-            agent_params = {}
-            for r in rows:
-                aid = r["agent_id"]
-                _agent_embeddings_r[aid] = True
-                agent_inserts.append(f"CREATE agent SET agent_id = $a_{aid}, embedding = $e_{aid}")
-                agent_params[f"a_{aid}"] = aid
-                agent_params[f"e_{aid}"] = r["persona_embedding"]
-            if agent_inserts:
-                _vec_db_r.query("; ".join(agent_inserts), agent_params)
-            log_info(f"Vector feed: copied {len(agent_inserts)} agent embeddings to per-sim DB")
-        except Exception as exc:
-            log_info(f"Vector feed setup failed: {exc}")
-            _vec_db_r = None
+    # ── Cached TWHIN-BERT rec system (Reddit) ──────────────────────
+    _last_embedded_post_id_rd = [0]
+    _user_embeddings_rd = [None]
+    _post_embeddings_rd = [None]
+    _post_ids_rd = []
+    _user_ids_rd = []
 
     if hasattr(result.env, 'platform'):
         _platform = result.env.platform
         _max_rec = getattr(_platform, 'max_rec_post_len', 20)
 
-        async def _vector_rec_update_reddit():
+        async def _twhin_rec_update_reddit():
+            """Cached TWHIN-BERT rec (Reddit)."""
             try:
                 cursor = _platform.db_cursor
 
-                if _vec_db_r and _embedding_svc_r:
-                    try:
-                        cursor.execute(
-                            "SELECT post_id, content FROM post WHERE post_id > ? ORDER BY post_id",
-                            (_last_embedded_post_id_r[0],),
-                        )
-                        new_posts = [(r[0], r[1]) for r in cursor.fetchall() if r[1]]
-                        if new_posts:
-                            contents = [p[1] for p in new_posts]
-                            embeddings = _embedding_svc_r.embed_batch(contents)
-                            batch_inserts = []
-                            batch_params = {}
-                            for idx, (post_id, content) in enumerate(new_posts):
-                                if idx < len(embeddings):
-                                    batch_inserts.append(
-                                        f"CREATE post SET post_id = $pid_{idx}, content = $c_{idx}, embedding = $emb_{idx}"
-                                    )
-                                    batch_params[f"pid_{idx}"] = post_id
-                                    batch_params[f"c_{idx}"] = content[:500]
-                                    batch_params[f"emb_{idx}"] = embeddings[idx]
-                            if batch_inserts:
-                                _vec_db_r.query("; ".join(batch_inserts), batch_params)
-                            _last_embedded_post_id_r[0] = new_posts[-1][0]
-                    except Exception as exc:
-                        log_info(f"Reddit post embedding error: {exc}")
+                if _user_embeddings_rd[0] is None:
+                    cursor.execute("SELECT user_id, bio FROM user ORDER BY user_id")
+                    rows = cursor.fetchall()
+                    _user_ids_rd.clear()
+                    bios = []
+                    for uid, bio in rows:
+                        _user_ids_rd.append(uid)
+                        bios.append(bio if bio else "user")
+                    if bios:
+                        _user_embeddings_rd[0] = _twhin_embed(bios)
+                        log_info(f"TWHIN rec: embedded {len(bios)} Reddit users")
 
-                cursor.execute("SELECT user_id FROM user")
-                users = [r[0] for r in cursor.fetchall()]
+                cursor.execute(
+                    "SELECT post_id, content FROM post WHERE post_id > ? ORDER BY post_id",
+                    (_last_embedded_post_id_rd[0],),
+                )
+                new_posts = [(pid, c) for pid, c in cursor.fetchall() if c]
+                if new_posts:
+                    new_ids = [p[0] for p in new_posts]
+                    new_vecs = _twhin_embed([p[1] for p in new_posts])
+                    _post_ids_rd.extend(new_ids)
+                    if _post_embeddings_rd[0] is None:
+                        _post_embeddings_rd[0] = new_vecs
+                    else:
+                        _post_embeddings_rd[0] = np.vstack([_post_embeddings_rd[0], new_vecs])
+                    _last_embedded_post_id_rd[0] = new_ids[-1]
+
                 cursor.execute("DELETE FROM rec")
                 insert_values = []
 
-                if _vec_db_r and _last_embedded_post_id_r[0] > 0 and _agent_embeddings_r:
-                    batch_parts = []
-                    batch_users = []
-                    for uid in users:
-                        if _agent_embeddings_r.get(uid):
-                            batch_parts.append(
-                                "SELECT post_id, vector::distance::knn() AS dist FROM post "
-                                "WHERE embedding <|" + str(_max_rec) + ",40|> "
-                                "(SELECT VALUE embedding FROM agent WHERE agent_id = " + str(uid) + " LIMIT 1)[0]"
-                            )
-                            batch_users.append(uid)
-
-                    if batch_parts:
-                        try:
-                            results = _vec_db_r.query("; ".join(batch_parts))
-                            if isinstance(results, list) and len(results) == len(batch_users):
-                                for i, uid in enumerate(batch_users):
-                                    rows = results[i] if isinstance(results[i], list) else [results[i]]
-                                    for r in rows:
-                                        pid = r.get("post_id") if isinstance(r, dict) else None
-                                        if pid is not None:
-                                            insert_values.append((uid, pid))
-                            elif isinstance(results, list):
-                                for r in results:
-                                    if isinstance(r, dict) and r.get("post_id") is not None:
-                                        for uid in users:
-                                            insert_values.append((uid, r["post_id"]))
-                        except Exception as exc:
-                            log_info(f"Reddit batch HNSW error: {exc}")
+                u = _user_embeddings_rd[0]
+                p = _post_embeddings_rd[0]
+                if u is not None and p is not None and len(p) > 0 and len(u) > 0:
+                    u_norm = u / (np.linalg.norm(u, axis=1, keepdims=True) + 1e-8)
+                    p_norm = p / (np.linalg.norm(p, axis=1, keepdims=True) + 1e-8)
+                    sim = u_norm @ p_norm.T
+                    k = min(_max_rec, sim.shape[1])
+                    top_k = np.argpartition(-sim, k, axis=1)[:, :k]
+                    for i, uid in enumerate(_user_ids_rd):
+                        for j in top_k[i]:
+                            insert_values.append((uid, _post_ids_rd[j]))
 
                 if not insert_values:
-                    cursor.execute(
-                        "SELECT post_id FROM post ORDER BY created_at DESC LIMIT ?",
-                        (min(200, _max_rec * 3),),
-                    )
+                    cursor.execute("SELECT post_id FROM post ORDER BY created_at DESC LIMIT ?", (min(200, _max_rec * 3),))
                     all_posts = [r[0] for r in cursor.fetchall()]
                     if all_posts:
-                        for uid in users:
+                        cursor.execute("SELECT user_id FROM user")
+                        for uid, in cursor.fetchall():
                             for pid in all_posts[:_max_rec]:
                                 insert_values.append((uid, pid))
 
                 if insert_values:
-                    cursor.executemany(
-                        "INSERT INTO rec (user_id, post_id) VALUES (?, ?)",
-                        insert_values,
-                    )
+                    cursor.executemany("INSERT INTO rec (user_id, post_id) VALUES (?, ?)", insert_values)
                     cursor.connection.commit()
-
             except Exception as exc:
-                log_info(f"Reddit vector rec error: {exc}")
+                log_info(f"Reddit TWHIN rec error: {exc}")
 
-        _platform.update_rec_table = _vector_rec_update_reddit
-        log_info(f"Vector feed enabled ({agent_count} agents, db={_vec_db_name_r})")
+        _platform.update_rec_table = _twhin_rec_update_reddit
+        log_info("TWHIN-BERT cached rec enabled (Reddit)")
 
     # AVM smart paging — evict all agents to stub state
     reddit_pager = None
@@ -1899,14 +1781,6 @@ async def run_reddit_simulation(
     result.total_actions = total_actions
     elapsed = (datetime.now() - start_time).total_seconds()
     log_info(f"模拟循环完成! 耗时: {elapsed:.1f}秒, 总动作: {total_actions}")
-
-    # Cleanup: drop per-sim vector feed database
-    if _vec_db_r and _vec_db_name_r:
-        try:
-            _main_storage_r._query("REMOVE DATABASE " + _vec_db_name_r)
-            log_info(f"Dropped vector feed db: {_vec_db_name_r}")
-        except Exception:
-            pass
 
     return result
 
