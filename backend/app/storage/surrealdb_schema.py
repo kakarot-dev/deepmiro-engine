@@ -194,9 +194,14 @@ DEFINE FIELD enable_reddit   ON simulation TYPE bool     DEFAULT true;
 DEFINE FIELD entities_count  ON simulation TYPE int      DEFAULT 0;
 DEFINE FIELD profiles_count  ON simulation TYPE int      DEFAULT 0;
 DEFINE FIELD entity_types    ON simulation TYPE array<string> DEFAULT [];
-DEFINE FIELD config_json     ON simulation TYPE string   DEFAULT "{}";
-DEFINE FIELD error           ON simulation TYPE option<string>;
-DEFINE FIELD user_id         ON simulation TYPE option<string>;
+DEFINE FIELD config_json        ON simulation TYPE string   DEFAULT "{}";
+DEFINE FIELD config_generated   ON simulation TYPE bool     DEFAULT false;
+DEFINE FIELD config_reasoning   ON simulation TYPE string   DEFAULT "";
+DEFINE FIELD current_round      ON simulation TYPE int      DEFAULT 0;
+DEFINE FIELD twitter_status     ON simulation TYPE string   DEFAULT "not_started";
+DEFINE FIELD reddit_status      ON simulation TYPE string   DEFAULT "not_started";
+DEFINE FIELD error              ON simulation TYPE option<string>;
+DEFINE FIELD user_id            ON simulation TYPE option<string>;
 DEFINE FIELD created_at      ON simulation TYPE datetime DEFAULT time::now();
 DEFINE FIELD updated_at      ON simulation TYPE datetime DEFAULT time::now();
 
