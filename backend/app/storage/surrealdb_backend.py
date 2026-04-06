@@ -63,9 +63,9 @@ class SurrealDBStorage(GraphStorage):
         """Establish SurrealDB connection, authenticate, select ns/db."""
         self._db = Surreal(self._url)
         # SDK v1.0.8 uses __enter__() to connect; newer versions use connect()
-        if hasattr(self._db, "connect"):
+        try:
             self._db.connect()
-        else:
+        except (AttributeError, TypeError):
             self._db.__enter__()
         self._db.use(self._namespace, self._database)
         self._db.signin({"username": self._user, "password": self._password})
