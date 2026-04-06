@@ -176,9 +176,11 @@ class SimulationManager:
             if threading.current_thread() is threading.main_thread():
                 storage = _get_surreal_storage()
             else:
-                # Background thread: create a fresh connection (WebSocket not thread-safe)
+                # Background thread: use HTTP (stateless, thread-safe) instead of WebSocket
                 from ..storage.surrealdb_backend import SurrealDBStorage
-                storage = SurrealDBStorage()
+                from ..config import Config
+                http_url = Config.SURREAL_URL.replace("ws://", "http://").replace("wss://", "https://")
+                storage = SurrealDBStorage(url=http_url)
 
             if storage:
                 sim_data = state.to_dict()
