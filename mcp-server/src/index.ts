@@ -58,12 +58,13 @@ async function startHttpTransport(config: MirofishConfig, authProvider?: AuthPro
       return;
     }
 
-    // New session — only allow initialize requests (HIGH FIX)
-    if (sessionId || !isInitializeRequest(req.body)) {
+    // New session or stale session — only allow initialize requests
+    if (!isInitializeRequest(req.body)) {
+      // Stale session ID (server restarted) or missing initialize — tell client to re-init
       res.status(400).json({
         jsonrpc: "2.0",
-        error: { code: -32000, message: "Bad request: must send initialize request without session ID" },
-        id: null,
+        error: { code: -32000, message: "Session expired or invalid. Please re-initialize." },
+        id: req.body?.id ?? null,
       });
       return;
     }

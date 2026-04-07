@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepMiro — Neural Shoal v5</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#07070a;color:#e8e4de;font-family:'DM Sans',system-ui;min-height:100vh;padding:2rem}
+  h1{font-family:'Syne';font-weight:800;font-size:2.2rem;letter-spacing:-.03em;text-align:center;margin-bottom:.3rem}
+  h1 span{color:#22d3ee}
+  .sub{text-align:center;color:#4a4a58;font-family:'JetBrains Mono';font-size:.75rem;margin-bottom:3rem}
+  .section{max-width:1300px;margin:0 auto 4rem}
+  .stitle{font-family:'Syne';font-weight:700;font-size:1.1rem;color:#22d3ee;opacity:.7;margin-bottom:.3rem}
+  .sdesc{color:#7a7a8a;font-size:.82rem;max-width:700px;line-height:1.6;margin-bottom:1.5rem}
+  .card{background:#08080d;border:1px solid #16161f;border-radius:20px;display:flex;align-items:center;justify-content:center;padding:2.5rem;margin-bottom:1.5rem;overflow:hidden}
+  .card:hover{border-color:#22d3ee15}
+  .card.sm{padding:1.2rem;border-radius:14px}
+  .card.xs{padding:.6rem;border-radius:8px;display:inline-flex;background:#0c0c12}
+  .card.light{background:#f0ede8;border-color:#d4d0c8}
+  .row{display:flex;align-items:center;gap:2rem;flex-wrap:wrap}
+  .col{display:flex;flex-direction:column;align-items:center;gap:.5rem}
+  .col label{font-family:'JetBrains Mono';font-size:.58rem;color:#4a4a58;text-transform:uppercase;letter-spacing:.12em}
+  .lockup{display:flex;align-items:center;gap:1.2rem}
+  .wm{font-family:'Syne';font-weight:700;font-size:2rem;letter-spacing:-.03em;color:#e8e4de}
+  .wm .d{color:#22d3ee}
+  .stacked-lock{display:flex;flex-direction:column;align-items:center;gap:.5rem}
+  .stacked-lock .wm{font-size:1.4rem;letter-spacing:.12em;text-transform:uppercase}
+  .stacked-lock .tag{font-family:'JetBrains Mono';font-size:.48rem;color:#7a7a8a;letter-spacing:.25em;text-transform:uppercase}
+  hr{border:none;border-top:1px solid #16161f;margin:1rem 0 2.5rem}
+</style>
+</head>
+<body>
+
+<h1>Neural Shoal <span>v5</span></h1>
+<p class="sub" id="counter">// bold shapes + particle dissolution + network texture</p>
+
+<div class="section">
+  <div class="stitle">Hero Mark</div>
+  <div class="sdesc">Bold, readable fish silhouette. The body is a filled shape with network texture inside. Fins are visible flowing ribbons that dissolve into particles at their tips. The fish is obvious first, clever second.</div>
+  <div class="card" id="hero-card"></div>
+</div>
+
+<hr>
+
+<div class="section">
+  <div class="stitle">Lockups</div>
+  <div class="row" style="gap:3rem">
+    <div class="col">
+      <label>Horizontal</label>
+      <div class="card sm">
+        <div class="lockup">
+          <div id="lockup-h"></div>
+          <span class="wm"><span class="d">Deep</span>Miro</span>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <label>Stacked</label>
+      <div class="card sm">
+        <div class="stacked-lock">
+          <div id="lockup-s"></div>
+          <span class="wm"><span class="d">DEEP</span>MIRO</span>
+          <span class="tag">swarm intelligence engine</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<div class="section">
+  <div class="stitle">Scale & Variants</div>
+  <div class="row">
+    <div class="col"><label>128px</label><div class="card xs" id="s128"></div></div>
+    <div class="col"><label>64px</label><div class="card xs" id="s64"></div></div>
+    <div class="col"><label>32px</label><div class="card xs" id="s32"></div></div>
+    <div class="col"><label>16px</label><div class="card xs" id="s16"></div></div>
+    <div class="col"><label>Mono</label><div class="card xs" id="smono"></div></div>
+    <div class="col"><label>Light bg</label><div class="card xs light" id="slight"></div></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// v5: BOLD FIRST, CLEVER SECOND
+// The fish is a clear filled silhouette. Network is texture.
+// Fins dissolve. Eye glows. Everything is VISIBLE.
+// ═══════════════════════════════════════════════════════════
+
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+}
+const rng = mulberry32(77);
+const R = (a, b) => a + rng() * (b - a);
+const RI = (a, b) => Math.floor(R(a, b));
+
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+  return e;
+}
+
+// ─── FISH GEOMETRY ───
+// All coordinates in a 600x360 viewBox
+const VW = 600, VH = 360;
+
+// Betta body path — hand-crafted bezier for a clear, beautiful profile
+// Swimming right. Mouth at right, tail at left.
+const BODY_PATH = `
+  M 130 180
+  C 130 180, 155 165, 180 158
+  C 210 149, 260 142, 310 140
+  C 360 138, 410 142, 440 150
+  C 465 156, 485 165, 498 175
+  C 508 183, 512 190, 510 195
+  C 512 200, 508 208, 498 215
+  C 485 226, 465 234, 440 240
+  C 410 248, 360 252, 310 250
+  C 260 248, 210 242, 180 233
+  C 155 226, 130 212, 130 210
+  Z
+`;
+
+// Control points for fin generation
+const bodyTop = (t) => {
+  // Approximate upper edge — t from 0 (tail) to 1 (mouth)
+  const x = 130 + t * 380;
+  const y = 180 - (58 * Math.sin(Math.PI * Math.pow(t, 0.55)) * (1 - 0.2*t*t));
+  return { x, y };
+};
+const bodyBot = (t) => {
+  const x = 130 + t * 380;
+  const y = 195 + (55 * Math.sin(Math.PI * Math.pow(t, 0.55)) * (1 - 0.2*t*t));
+  return { x, y };
+};
+const bodyMid = (t) => {
+  const top = bodyTop(t);
+  const bot = bodyBot(t);
+  return { x: (top.x + bot.x) / 2, y: (top.y + bot.y) / 2 };
+};
+const bodyHalf = (t) => {
+  const top = bodyTop(t);
+  const bot = bodyBot(t);
+  return (bot.y - top.y) / 2;
+};
+
+function buildLogo(color, bgDark = true) {
+  const c = color;
+  const svg = el('svg', { viewBox: `0 0 ${VW} ${VH}`, xmlns: NS });
+
+  // ── DEFS ──
+  const defs = el('defs', {});
+
+  // Body gradient — brighter toward head
+  const bg = el('linearGradient', { id: 'bGrad', x1: '0%', y1: '0%', x2: '100%', y2: '0%' });
+  bg.appendChild(el('stop', { offset: '0%', 'stop-color': c, 'stop-opacity': '0.06' }));
+  bg.appendChild(el('stop', { offset: '40%', 'stop-color': c, 'stop-opacity': '0.12' }));
+  bg.appendChild(el('stop', { offset: '80%', 'stop-color': c, 'stop-opacity': '0.2' }));
+  bg.appendChild(el('stop', { offset: '100%', 'stop-color': c, 'stop-opacity': '0.28' }));
+  defs.appendChild(bg);
+
+  // Body edge gradient (for the outline)
+  const eg = el('linearGradient', { id: 'eGrad', x1: '0%', y1: '0%', x2: '100%', y2: '0%' });
+  eg.appendChild(el('stop', { offset: '0%', 'stop-color': c, 'stop-opacity': '0.08' }));
+  eg.appendChild(el('stop', { offset: '50%', 'stop-color': c, 'stop-opacity': '0.25' }));
+  eg.appendChild(el('stop', { offset: '100%', 'stop-color': c, 'stop-opacity': '0.5' }));
+  defs.appendChild(eg);
+
+  // Eye glow
+  const eyeG = el('radialGradient', { id: 'eyeGlow', cx: '50%', cy: '50%', r: '50%' });
+  eyeG.appendChild(el('stop', { offset: '0%', 'stop-color': c, 'stop-opacity': '0.8' }));
+  eyeG.appendChild(el('stop', { offset: '40%', 'stop-color': c, 'stop-opacity': '0.2' }));
+  eyeG.appendChild(el('stop', { offset: '100%', 'stop-color': c, 'stop-opacity': '0' }));
+  defs.appendChild(eyeG);
+
+  // Glow filters
+  const f1 = el('filter', { id: 'glow', x: '-60%', y: '-60%', width: '220%', height: '220%' });
+  f1.appendChild(el('feGaussianBlur', { in: 'SourceGraphic', stdDeviation: '6', result: 'b' }));
+  f1.appendChild(el('feComposite', { in: 'SourceGraphic', in2: 'b', operator: 'over' }));
+  defs.appendChild(f1);
+
+  const f2 = el('filter', { id: 'softglow', x: '-40%', y: '-40%', width: '180%', height: '180%' });
+  f2.appendChild(el('feGaussianBlur', { in: 'SourceGraphic', stdDeviation: '2.5', result: 'b2' }));
+  f2.appendChild(el('feComposite', { in: 'SourceGraphic', in2: 'b2', operator: 'over' }));
+  defs.appendChild(f2);
+
+  svg.appendChild(defs);
+
+  // ════════════════════════════════════════════════
+  // LAYER 1: CAUDAL FIN — bold flowing ribbons
+  // 30 bezier curves fanning out from tail, dissolving into particles
+  // ════════════════════════════════════════════════
+  const caudalG = el('g', { id: 'caudal' });
+  const tailPt = bodyMid(0);
+
+  for (let i = 0; i < 35; i++) {
+    const angle = R(-1.3, 1.3);
+    const len = R(60, 180);
+    const wobble = R(-30, 30);
+
+    const ex = tailPt.x - len * Math.cos(angle * 0.6);
+    const ey = tailPt.y + len * Math.sin(angle) + R(-10, 10);
+    const cpx = tailPt.x - len * 0.55 + wobble;
+    const cpy = tailPt.y + len * 0.35 * Math.sin(angle) + R(-15, 15);
+
+    const sw = R(0.5, 2.2) * (1 - Math.abs(angle) / 2);
+    const opacity = R(0.06, 0.22) * (1 - Math.abs(angle) / 1.8);
+
+    caudalG.appendChild(el('path', {
+      d: `M ${tailPt.x} ${tailPt.y} Q ${cpx} ${cpy}, ${ex} ${ey}`,
+      stroke: c, 'stroke-width': sw, fill: 'none', opacity,
+      'stroke-linecap': 'round'
+    }));
+
+    // Particles at ribbon tips
+    for (let j = 0; j < RI(3, 7); j++) {
+      const st = R(0.5, 1);
+      const px = tailPt.x*(1-st)*(1-st) + 2*cpx*st*(1-st) + ex*st*st;
+      const py = tailPt.y*(1-st)*(1-st) + 2*cpy*st*(1-st) + ey*st*st;
+      caudalG.appendChild(el('circle', {
+        cx: px + R(-4, 4), cy: py + R(-4, 4),
+        r: R(0.6, 2.2) * (1 - st),
+        fill: c, opacity: R(0.04, 0.15) * (1 - st * 0.7)
+      }));
+    }
+  }
+  svg.appendChild(caudalG);
+
+  // ════════════════════════════════════════════════
+  // LAYER 2: DORSAL FIN — upward flowing ribbons
+  // ════════════════════════════════════════════════
+  const dorsalG = el('g', { id: 'dorsal' });
+  for (let i = 0; i < 25; i++) {
+    const t = R(0.15, 0.9);
+    const start = bodyTop(t);
+    const rise = R(30, 110) * (0.3 + t * 0.9);
+    const drift = R(-20, 45);
+
+    const ex = start.x + drift;
+    const ey = start.y - rise;
+    const cpx = start.x + drift * 0.3 + R(-10, 10);
+    const cpy = start.y - rise * 0.55 + R(-8, 8);
+
+    const sw = R(0.4, 1.8) * (0.3 + t * 0.8);
+    const opacity = R(0.05, 0.2) * (0.2 + t * 0.9);
+
+    dorsalG.appendChild(el('path', {
+      d: `M ${start.x} ${start.y} Q ${cpx} ${cpy}, ${ex} ${ey}`,
+      stroke: c, 'stroke-width': sw, fill: 'none', opacity,
+      'stroke-linecap': 'round'
+    }));
+
+    // Tip scatter
+    for (let j = 0; j < RI(2, 5); j++) {
+      dorsalG.appendChild(el('circle', {
+        cx: ex + R(-6, 6), cy: ey + R(-6, 4),
+        r: R(0.5, 1.5), fill: c, opacity: R(0.03, 0.1)
+      }));
+    }
+  }
+  svg.appendChild(dorsalG);
+
+  // ════════════════════════════════════════════════
+  // LAYER 3: VENTRAL FIN — downward flowing ribbons
+  // ════════════════════════════════════════════════
+  const ventralG = el('g', { id: 'ventral' });
+  for (let i = 0; i < 20; i++) {
+    const t = R(0.2, 0.85);
+    const start = bodyBot(t);
+    const drop = R(25, 90) * (0.3 + t * 0.8);
+    const drift = R(-15, 35);
+
+    const ex = start.x + drift;
+    const ey = start.y + drop;
+    const cpx = start.x + drift * 0.4 + R(-8, 8);
+    const cpy = start.y + drop * 0.5 + R(-5, 5);
+
+    const sw = R(0.4, 1.5) * (0.3 + t * 0.7);
+    const opacity = R(0.04, 0.18) * (0.2 + t * 0.8);
+
+    ventralG.appendChild(el('path', {
+      d: `M ${start.x} ${start.y} Q ${cpx} ${cpy}, ${ex} ${ey}`,
+      stroke: c, 'stroke-width': sw, fill: 'none', opacity,
+      'stroke-linecap': 'round'
+    }));
+
+    for (let j = 0; j < RI(2, 4); j++) {
+      ventralG.appendChild(el('circle', {
+        cx: ex + R(-5, 5), cy: ey + R(-3, 6),
+        r: R(0.4, 1.2), fill: c, opacity: R(0.03, 0.08)
+      }));
+    }
+  }
+  svg.appendChild(ventralG);
+
+  // ════════════════════════════════════════════════
+  // LAYER 4: PECTORAL FIN
+  // ════════════════════════════════════════════════
+  const pecG = el('g', { id: 'pectoral' });
+  const pecStart = bodyBot(0.72);
+  for (let i = 0; i < 10; i++) {
+    const drop = R(15, 50);
+    const drift = R(-8, 15);
+    const ex = pecStart.x + drift;
+    const ey = pecStart.y + drop;
+    pecG.appendChild(el('path', {
+      d: `M ${pecStart.x} ${pecStart.y} Q ${pecStart.x + drift*0.4} ${pecStart.y + drop*0.5}, ${ex} ${ey}`,
+      stroke: c, 'stroke-width': R(0.3, 1), fill: 'none', opacity: R(0.06, 0.16),
+      'stroke-linecap': 'round'
+    }));
+  }
+  svg.appendChild(pecG);
+
+  // ════════════════════════════════════════════════
+  // LAYER 5: BODY FILL — the actual silhouette!
+  // This is what makes the fish READABLE.
+  // ════════════════════════════════════════════════
+  const bodyFillG = el('g', { id: 'body-fill' });
+  bodyFillG.appendChild(el('path', {
+    d: BODY_PATH, fill: 'url(#bGrad)', stroke: 'none'
+  }));
+  // Subtle outline
+  bodyFillG.appendChild(el('path', {
+    d: BODY_PATH, fill: 'none', stroke: 'url(#eGrad)', 'stroke-width': '1'
+  }));
+  svg.appendChild(bodyFillG);
+
+  // ════════════════════════════════════════════════
+  // LAYER 6: INTERNAL NETWORK — texture inside body
+  // Spine, ribs, mesh connections — all VISIBLE
+  // ════════════════════════════════════════════════
+  const meshG = el('g', { id: 'mesh' });
+
+  // Generate particles on a grid inside the body
+  const meshPts = [];
+  for (let i = 0; i < 400; i++) {
+    const t = R(0.03, 0.97);
+    const halfH = bodyHalf(t);
+    if (halfH < 3) continue;
+    const mid = bodyMid(t);
+    const yOff = R(-0.95, 0.95) * halfH;
+    const x = mid.x;
+    const y = mid.y + yOff;
+    const xf = Math.pow(t, 0.9); // brightness factor
+
+    const r = R(1, 3.5) * (0.4 + xf * 0.7);
+    const opacity = R(0.1, 0.45) * (0.15 + xf * 0.9);
+
+    meshPts.push({ x, y, r, opacity, t });
+    meshG.appendChild(el('circle', {
+      cx: x, cy: y, r, fill: c, opacity: Math.min(opacity, 0.55)
+    }));
+  }
+
+  // Connections — proximity based, visible
+  for (let i = 0; i < meshPts.length; i++) {
+    const p = meshPts[i];
+    const maxD = 28 - p.t * 10;
+    let conns = 0;
+    const maxC = 1 + Math.floor(p.t * 3);
+
+    for (let j = i + 1; j < meshPts.length && conns < maxC; j++) {
+      const q = meshPts[j];
+      const dist = Math.sqrt((p.x-q.x)**2 + (p.y-q.y)**2);
+      if (dist < maxD) {
+        const f = (1 - dist / maxD);
+        const opacity = f * 0.2 * (0.2 + p.t * 0.9);
+        meshG.appendChild(el('line', {
+          x1: p.x, y1: p.y, x2: q.x, y2: q.y,
+          stroke: c, 'stroke-width': f * 1.2 * (0.3 + p.t * 0.8),
+          opacity: Math.max(0.02, opacity)
+        }));
+        conns++;
+      }
+    }
+  }
+  svg.appendChild(meshG);
+
+  // ════════════════════════════════════════════════
+  // LAYER 7: CHAOS SCATTER — particles outside body
+  // ════════════════════════════════════════════════
+  const chaosG = el('g', { id: 'chaos' });
+  for (let i = 0; i < 120; i++) {
+    const x = R(10, VW - 10);
+    const y = R(10, VH - 10);
+    // Skip if inside body area
+    const t = Math.max(0, Math.min(1, (x - 130) / 380));
+    const mid = bodyMid(t);
+    const halfH = bodyHalf(t);
+    if (Math.abs(y - mid.y) < halfH + 10) continue;
+
+    // Closer to body = denser
+    const distFromBody = Math.abs(y - mid.y) - halfH;
+    const proximity = Math.max(0, 1 - distFromBody / 120);
+    if (rng() > 0.2 + proximity * 0.5) continue;
+
+    const r = R(0.5, 2) * (0.5 + proximity * 0.5);
+    const opacity = R(0.03, 0.12) * (0.3 + proximity * 0.7);
+
+    chaosG.appendChild(el('circle', {
+      cx: x, cy: y, r, fill: c, opacity
+    }));
+  }
+  svg.appendChild(chaosG);
+
+  // ════════════════════════════════════════════════
+  // LAYER 8: HEAD DENSE OVERLAY — extra brightness
+  // ════════════════════════════════════════════════
+  const headG = el('g', { id: 'head', filter: 'url(#softglow)' });
+  const headPts = [];
+  for (let i = 0; i < 60; i++) {
+    const t = R(0.7, 0.96);
+    const mid = bodyMid(t);
+    const halfH = bodyHalf(t);
+    const x = mid.x;
+    const y = mid.y + R(-0.7, 0.7) * halfH;
+    const r = R(1.5, 4) * (0.5 + (t - 0.7) * 3);
+    const opacity = R(0.2, 0.55) * (0.4 + (t - 0.7) * 4);
+    headPts.push({ x, y });
+    headG.appendChild(el('circle', { cx: x, cy: y, r, fill: c, opacity: Math.min(opacity, 0.6) }));
+  }
+  // Head connections — tight, bright
+  for (let i = 0; i < headPts.length; i++) {
+    for (let j = i + 1; j < headPts.length; j++) {
+      const a = headPts[i], b = headPts[j];
+      const dist = Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2);
+      if (dist < 18) {
+        headG.appendChild(el('line', {
+          x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+          stroke: c, 'stroke-width': (1 - dist/18) * 1.5,
+          opacity: (1 - dist/18) * 0.25
+        }));
+      }
+    }
+  }
+  svg.appendChild(headG);
+
+  // ════════════════════════════════════════════════
+  // LAYER 9: THE EYE — the anchor of the entire mark
+  // ════════════════════════════════════════════════
+  const eyeX = bodyMid(0.85).x;
+  const eyeY = bodyMid(0.85).y - 5;
+  const eyeGrp = el('g', { id: 'eye', filter: 'url(#glow)' });
+
+  // Halo rings
+  for (let i = 5; i >= 0; i--) {
+    eyeGrp.appendChild(el('circle', {
+      cx: eyeX, cy: eyeY, r: 10 + i * 4,
+      fill: 'none', stroke: c, 'stroke-width': 0.6,
+      opacity: 0.06 + (5-i) * 0.03
+    }));
+  }
+  // Glow
+  eyeGrp.appendChild(el('circle', { cx: eyeX, cy: eyeY, r: 30, fill: 'url(#eyeGlow)' }));
+  // Iris
+  eyeGrp.appendChild(el('circle', { cx: eyeX, cy: eyeY, r: 12, fill: c, opacity: '1' }));
+  // Ring
+  eyeGrp.appendChild(el('circle', { cx: eyeX, cy: eyeY, r: 16, fill: 'none', stroke: c, 'stroke-width': '1', opacity: '0.25' }));
+  // Highlight
+  eyeGrp.appendChild(el('circle', { cx: eyeX - 3, cy: eyeY - 3, r: 4, fill: '#fff', opacity: '0.4' }));
+  // Center bright
+  eyeGrp.appendChild(el('circle', { cx: eyeX, cy: eyeY, r: 5, fill: '#fff', opacity: '0.15' }));
+
+  svg.appendChild(eyeGrp);
+
+  return svg;
+}
+
+// ─── Simplified mark for smaller sizes ───
+function buildSmall(w, h, color) {
+  const c = color;
+  const svg = el('svg', { width: w, height: h, viewBox: `0 0 ${VW} ${VH}`, xmlns: NS });
+
+  const defs = el('defs', {});
+  const f = el('filter', { id: 'gSm', x: '-50%', y: '-50%', width: '200%', height: '200%' });
+  f.appendChild(el('feGaussianBlur', { in: 'SourceGraphic', stdDeviation: '4' }));
+  defs.appendChild(f);
+
+  const bg = el('linearGradient', { id: 'bGS', x1: '0%', y1: '0%', x2: '100%', y2: '0%' });
+  bg.appendChild(el('stop', { offset: '0%', 'stop-color': c, 'stop-opacity': '0.05' }));
+  bg.appendChild(el('stop', { offset: '100%', 'stop-color': c, 'stop-opacity': '0.25' }));
+  defs.appendChild(bg);
+
+  svg.appendChild(defs);
+
+  // Body silhouette
+  if (w >= 64) {
+    svg.appendChild(el('path', { d: BODY_PATH, fill: 'url(#bGS)', stroke: c, 'stroke-width': '0.8', 'stroke-opacity': '0.2' }));
+  }
+
+  // Tail hint
+  if (w >= 64) {
+    for (let i = 0; i < 8; i++) {
+      const angle = R(-1, 1);
+      const len = R(40, 100);
+      const ex = 130 - len * Math.cos(angle * 0.5);
+      const ey = 195 + len * Math.sin(angle);
+      svg.appendChild(el('path', {
+        d: `M 130 195 Q ${130-len*0.4} ${195+len*0.3*Math.sin(angle)}, ${ex} ${ey}`,
+        stroke: c, 'stroke-width': R(0.4, 1.2), fill: 'none',
+        opacity: R(0.06, 0.14), 'stroke-linecap': 'round'
+      }));
+    }
+  }
+
+  // Key body nodes
+  const steps = w >= 64 ? 8 : w >= 32 ? 5 : 3;
+  for (let i = 0; i < steps; i++) {
+    const t = 0.1 + (i / steps) * 0.85;
+    const p = bodyMid(t);
+    const xf = Math.pow(t, 0.8);
+    const r = (2 + xf * 6) * (w >= 64 ? 1 : w >= 32 ? 1.5 : 2.5);
+    const opacity = 0.1 + xf * 0.6;
+    svg.appendChild(el('circle', { cx: p.x, cy: p.y, r, fill: c, opacity: Math.min(opacity, 0.8) }));
+  }
+
+  // Eye
+  const eyeX = bodyMid(0.85).x;
+  const eyeY = bodyMid(0.85).y - 5;
+  const eyeR = w >= 64 ? 12 : w >= 32 ? 16 : 22;
+  svg.appendChild(el('circle', { cx: eyeX, cy: eyeY, r: eyeR * 1.5, fill: c, opacity: '0.2', filter: 'url(#gSm)' }));
+  svg.appendChild(el('circle', { cx: eyeX, cy: eyeY, r: eyeR, fill: c, opacity: '1' }));
+  if (w >= 32) {
+    svg.appendChild(el('circle', { cx: eyeX - 2, cy: eyeY - 2, r: eyeR * 0.3, fill: '#fff', opacity: '0.35' }));
+  }
+
+  return svg;
+}
+
+// ─── RENDER ───
+function render() {
+  const hero = buildLogo('#22d3ee');
+  hero.setAttribute('width', '650');
+  hero.setAttribute('height', '390');
+  hero.style.maxWidth = '100%';
+  hero.style.height = 'auto';
+  document.getElementById('hero-card').appendChild(hero);
+
+  // Lockups
+  const lh = buildSmall(150, 90, '#22d3ee');
+  document.getElementById('lockup-h').appendChild(lh);
+  const ls = buildSmall(130, 78, '#22d3ee');
+  document.getElementById('lockup-s').appendChild(ls);
+
+  // Scale tests
+  document.getElementById('s128').appendChild(buildSmall(128, 76, '#22d3ee'));
+  document.getElementById('s64').appendChild(buildSmall(64, 38, '#22d3ee'));
+  document.getElementById('s32').appendChild(buildSmall(32, 19, '#22d3ee'));
+  document.getElementById('s16').appendChild(buildSmall(16, 16, '#22d3ee'));
+  document.getElementById('smono').appendChild(buildSmall(128, 76, '#e8e4de'));
+  document.getElementById('slight').appendChild(buildSmall(128, 76, '#0e7490'));
+
+  // Count
+  setTimeout(() => {
+    const total = document.querySelectorAll('#hero-card svg *').length;
+    document.getElementById('counter').textContent =
+      `// ${total} svg elements — bold shapes + particle dissolution + network texture`;
+  }, 50);
+}
+
+render();
+</script>
+</body>
+</html>

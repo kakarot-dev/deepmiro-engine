@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepMiro — Network Sphere Final</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#07070a;color:#e8e4de;font-family:'DM Sans',system-ui;min-height:100vh;padding:2rem}
+  h1{font-family:'Syne';font-weight:800;font-size:2.2rem;letter-spacing:-.03em;text-align:center;margin-bottom:.2rem}
+  h1 span{color:#22d3ee}
+  .sub{text-align:center;color:#4a4a58;font-family:'JetBrains Mono';font-size:.72rem;margin-bottom:3rem}
+  .section{max-width:1200px;margin:0 auto 3.5rem}
+  .stitle{font-family:'Syne';font-weight:700;font-size:1.1rem;color:#22d3ee;opacity:.7;margin-bottom:.3rem}
+  .sdesc{color:#7a7a8a;font-size:.8rem;max-width:650px;line-height:1.6;margin-bottom:1.5rem}
+  .card{background:#08080d;border:1px solid #16161f;border-radius:20px;display:flex;align-items:center;justify-content:center;padding:2.5rem;margin-bottom:1.5rem}
+  .card:hover{border-color:#22d3ee12}
+  .card.sm{padding:1.2rem;border-radius:14px}
+  .card.xs{padding:.5rem;border-radius:8px;display:inline-flex;background:#0c0c12}
+  .card.light{background:#f0ede8;border-color:#d4d0c8}
+  .row{display:flex;align-items:center;gap:2rem;flex-wrap:wrap}
+  .col{display:flex;flex-direction:column;align-items:center;gap:.4rem}
+  .col label{font-family:'JetBrains Mono';font-size:.55rem;color:#4a4a58;text-transform:uppercase;letter-spacing:.1em}
+  .lockup{display:flex;align-items:center;gap:1rem}
+  .wm{font-family:'Syne';font-weight:700;font-size:1.8rem;letter-spacing:-.03em;color:#e8e4de}
+  .wm .d{color:#22d3ee}
+  .stacked-lock{display:flex;flex-direction:column;align-items:center;gap:.5rem}
+  .stacked-lock .wm{font-size:1.3rem;letter-spacing:.12em;text-transform:uppercase}
+  .stacked-lock .tag{font-family:'JetBrains Mono';font-size:.45rem;color:#7a7a8a;letter-spacing:.25em;text-transform:uppercase}
+  hr{border:none;border-top:1px solid #16161f;margin:1rem 0 2.5rem}
+  canvas{border-radius:6px}
+</style>
+</head>
+<body>
+
+<h1>The Network Sphere <span>— Final</span></h1>
+<p class="sub">// a globe of interconnected agents &mdash; depth, structure, convergence</p>
+
+<!-- HERO -->
+<div class="section">
+  <div class="stitle">Hero Mark</div>
+  <div class="sdesc">500 fibonacci-distributed nodes on a rotating sphere. Latitude and longitude wireframe. Perspective projection gives depth — front nodes are large and bright, back nodes are small and dim. The center glows: the prediction core.</div>
+  <div class="card" id="hero"></div>
+</div>
+
+<hr>
+
+<!-- LOCKUPS -->
+<div class="section">
+  <div class="stitle">Lockups</div>
+  <div class="row" style="gap:3rem">
+    <div class="col">
+      <label>Horizontal</label>
+      <div class="card sm">
+        <div class="lockup" id="lock-h"></div>
+      </div>
+    </div>
+    <div class="col">
+      <label>Stacked</label>
+      <div class="card sm">
+        <div class="stacked-lock" id="lock-s"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<!-- SCALE -->
+<div class="section">
+  <div class="stitle">Scale & Variants</div>
+  <div class="sdesc">Progressive simplification. At small sizes, the sphere reduces to its essential gesture — a glowing core surrounded by orbiting particles.</div>
+  <div class="row">
+    <div class="col"><label>128px</label><div class="card xs" id="s128"></div></div>
+    <div class="col"><label>64px</label><div class="card xs" id="s64"></div></div>
+    <div class="col"><label>48px</label><div class="card xs" id="s48"></div></div>
+    <div class="col"><label>32px</label><div class="card xs" id="s32"></div></div>
+    <div class="col"><label>16px</label><div class="card xs" id="s16"></div></div>
+    <div class="col"><label>Monochrome</label><div class="card xs" id="smono"></div></div>
+    <div class="col"><label>Light bg</label><div class="card xs light" id="slight"></div></div>
+  </div>
+</div>
+
+<hr>
+
+<!-- VARIATIONS -->
+<div class="section">
+  <div class="stitle">Rotation Variants</div>
+  <div class="sdesc">The same sphere from different viewing angles. Each rotation produces a distinct but clearly related mark.</div>
+  <div class="row" id="rotations"></div>
+</div>
+
+<script>
+// ── PRNG ──
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+let seed;
+function resetRng(s){seed=mulberry32(s)}
+function R(a,b){return a+seed()*(b-a)}
+
+const cyan=(a)=>`rgba(34,211,238,${a})`;
+const white=(a)=>`rgba(255,255,255,${a})`;
+
+function makeCanvas(w,h,dpr=2){
+  const c=document.createElement('canvas');
+  c.width=w*dpr;c.height=h*dpr;
+  c.style.width=w+'px';c.style.height=h+'px';
+  const ctx=c.getContext('2d');
+  ctx.scale(dpr,dpr);
+  return{c,ctx};
+}
+
+function drawGlow(ctx,x,y,r,alpha){
+  const grad=ctx.createRadialGradient(x,y,0,x,y,r);
+  grad.addColorStop(0,cyan(alpha));
+  grad.addColorStop(0.4,cyan(alpha*0.3));
+  grad.addColorStop(1,cyan(0));
+  ctx.fillStyle=grad;
+  ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+}
+
+// ═══════════════════════════════════════════════════════
+// THE NETWORK SPHERE — full detail
+// ═══════════════════════════════════════════════════════
+function drawSphere(ctx, w, h, opts={}){
+  const {
+    nodeCount=500,
+    rotX=0.3,
+    rotY=0.2,
+    color=cyan,
+    mono=false,
+    darkColor=null,
+    detail='full' // 'full','medium','simple','icon'
+  } = opts;
+
+  resetRng(66);
+  const cx=w/2, cy=h/2;
+  const radius=Math.min(w,h)*0.4;
+
+  const col = mono ? (a)=>`rgba(232,228,222,${a})` :
+              darkColor ? (a)=>`rgba(14,116,144,${a})` : cyan;
+
+  // ── 3D rotation helpers ──
+  function rotatePoint(x,y,z){
+    // Rotate around Y axis
+    let x1=x*Math.cos(rotY)-z*Math.sin(rotY);
+    let z1=x*Math.sin(rotY)+z*Math.cos(rotY);
+    // Rotate around X axis
+    let y1=y*Math.cos(rotX)-z1*Math.sin(rotX);
+    let z2=y*Math.sin(rotX)+z1*Math.cos(rotX);
+    return{x:x1,y:y1,z:z2};
+  }
+
+  function project(x3,y3,z3){
+    const p=1/(2-z3*0.6);
+    return{x:cx+x3*radius*p,y:cy+y3*radius*p,depth:(z3+1)/2};
+  }
+
+  // ── Generate fibonacci sphere points ──
+  const pts=[];
+  const golden=Math.PI*(3-Math.sqrt(5));
+
+  for(let i=0;i<nodeCount;i++){
+    const t=i/(nodeCount-1);
+    const inc=Math.acos(1-2*t);
+    const azi=golden*i;
+
+    let x3=Math.sin(inc)*Math.cos(azi);
+    let y3=Math.sin(inc)*Math.sin(azi);
+    let z3=Math.cos(inc);
+
+    const rot=rotatePoint(x3,y3,z3);
+    const proj=project(rot.x,rot.y,rot.z);
+
+    pts.push({
+      ...proj,
+      z3:rot.z,
+      size:0.4+proj.depth*3.2,
+      alpha:0.03+proj.depth*0.6
+    });
+  }
+
+  pts.sort((a,b)=>a.z3-b.z3);
+
+  if(detail==='full'||detail==='medium'){
+    // ── Atmosphere haze ──
+    drawGlow(ctx,cx,cy,radius*1.2,0.04);
+
+    // ── Latitude rings ──
+    const latCount=detail==='full'?7:4;
+    for(let lat=-latCount;lat<=latCount;lat++){
+      const y3=lat/(latCount+1);
+      const ringR3=Math.sqrt(1-y3*y3);
+
+      ctx.strokeStyle=col(0.025+Math.max(0,0.015-Math.abs(y3)*0.02));
+      ctx.lineWidth=0.3;
+      ctx.beginPath();
+      for(let a=0;a<=360;a+=3){
+        const rad=a*Math.PI/180;
+        const p3={x:ringR3*Math.cos(rad),y:y3,z:ringR3*Math.sin(rad)};
+        const rot=rotatePoint(p3.x,p3.y,p3.z);
+        const proj=project(rot.x,rot.y,rot.z);
+        if(a===0)ctx.moveTo(proj.x,proj.y);else ctx.lineTo(proj.x,proj.y);
+      }
+      ctx.stroke();
+    }
+
+    // ── Longitude arcs ──
+    const lonCount=detail==='full'?12:6;
+    for(let lon=0;lon<lonCount;lon++){
+      const a=lon*(Math.PI/lonCount*2);
+      ctx.strokeStyle=col(0.02);
+      ctx.lineWidth=0.25;
+      ctx.beginPath();
+      for(let s=0;s<=60;s++){
+        const inc2=s/60*Math.PI;
+        const p3={x:Math.sin(inc2)*Math.cos(a),y:Math.cos(inc2),z:Math.sin(inc2)*Math.sin(a)};
+        const rot=rotatePoint(p3.x,p3.y,p3.z);
+        const proj=project(rot.x,rot.y,rot.z);
+        if(s===0)ctx.moveTo(proj.x,proj.y);else ctx.lineTo(proj.x,proj.y);
+      }
+      ctx.stroke();
+    }
+  }
+
+  // ── Connections ──
+  if(detail==='full'||detail==='medium'){
+    const maxConns=detail==='full'?5:3;
+    const maxDist=detail==='full'?radius*0.22:radius*0.3;
+
+    for(let i=0;i<pts.length;i++){
+      const a=pts[i];
+      let conns=0;
+      for(let j=i+1;j<pts.length&&conns<maxConns;j++){
+        const b=pts[j];
+        const dist=Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2);
+        if(dist<maxDist){
+          const avg=(a.depth+b.depth)/2;
+          ctx.strokeStyle=col(0.01+avg*0.16);
+          ctx.lineWidth=0.1+avg*0.8;
+          ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+          conns++;
+        }
+      }
+    }
+  }
+
+  // ── Nodes ──
+  for(const p of pts){
+    if(detail==='simple'&&p.alpha<0.2)continue;
+    if(detail==='icon'&&p.alpha<0.35)continue;
+
+    const sz=detail==='icon'?p.size*1.5:detail==='simple'?p.size*1.2:p.size;
+    ctx.fillStyle=col(p.alpha);
+    ctx.beginPath();ctx.arc(p.x,p.y,sz,0,Math.PI*2);ctx.fill();
+
+    // Front nodes get a subtle glow
+    if(detail==='full'&&p.depth>0.75){
+      drawGlow(ctx,p.x,p.y,sz*3,p.alpha*0.08);
+    }
+  }
+
+  if(detail==='full'){
+    // ── Equator ring ──
+    ctx.strokeStyle=col(0.08);
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    for(let a=0;a<=360;a+=2){
+      const rad=a*Math.PI/180;
+      const p3={x:Math.cos(rad),y:0,z:Math.sin(rad)};
+      const rot=rotatePoint(p3.x,p3.y,p3.z);
+      const proj=project(rot.x,rot.y,rot.z);
+      if(a===0)ctx.moveTo(proj.x,proj.y);else ctx.lineTo(proj.x,proj.y);
+    }
+    ctx.stroke();
+
+    // ── Orbiting particles ──
+    for(let i=0;i<30;i++){
+      const a=R(0,Math.PI*2);
+      const orbitR=radius*R(1.05,1.25);
+      const orbitTilt=R(-0.15,0.15);
+      const px=cx+Math.cos(a)*orbitR;
+      const py=cy+Math.sin(a)*orbitR*0.3+Math.sin(a)*orbitR*orbitTilt;
+      ctx.fillStyle=col(R(0.04,0.14));
+      ctx.beginPath();ctx.arc(px,py,R(0.4,1.5),0,Math.PI*2);ctx.fill();
+    }
+  }
+
+  // ── Center eye ──
+  const eyeR=detail==='icon'?radius*0.22:detail==='simple'?radius*0.15:radius*0.1;
+  drawGlow(ctx,cx,cy,eyeR*4,0.4);
+
+  // Halo rings
+  if(detail!=='icon'){
+    for(let i=3;i>=0;i--){
+      ctx.strokeStyle=col(0.04+i*0.03);
+      ctx.lineWidth=0.5;
+      ctx.beginPath();ctx.arc(cx,cy,eyeR+i*3+3,0,Math.PI*2);ctx.stroke();
+    }
+  }
+
+  ctx.fillStyle=col(1);
+  ctx.beginPath();ctx.arc(cx,cy,eyeR,0,Math.PI*2);ctx.fill();
+
+  if(eyeR>3){
+    ctx.strokeStyle=col(0.25);
+    ctx.lineWidth=0.7;
+    ctx.beginPath();ctx.arc(cx,cy,eyeR*1.4,0,Math.PI*2);ctx.stroke();
+
+    ctx.fillStyle=white(0.4);
+    ctx.beginPath();ctx.arc(cx-eyeR*0.22,cy-eyeR*0.22,eyeR*0.3,0,Math.PI*2);ctx.fill();
+
+    ctx.fillStyle=white(0.12);
+    ctx.beginPath();ctx.arc(cx,cy,eyeR*0.4,0,Math.PI*2);ctx.fill();
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════
+
+// Hero
+const{c:heroC,ctx:heroCtx}=makeCanvas(400,400);
+drawSphere(heroCtx,400,400,{nodeCount:500,detail:'full'});
+document.getElementById('hero').appendChild(heroC);
+
+// Horizontal lockup
+const lockH=document.getElementById('lock-h');
+const{c:lhC,ctx:lhCtx}=makeCanvas(60,60);
+drawSphere(lhCtx,60,60,{nodeCount:200,detail:'medium'});
+lockH.appendChild(lhC);
+const wm1=document.createElement('span');wm1.className='wm';wm1.innerHTML='<span class="d">Deep</span>Miro';
+lockH.appendChild(wm1);
+
+// Stacked lockup
+const lockS=document.getElementById('lock-s');
+const{c:lsC,ctx:lsCtx}=makeCanvas(80,80);
+drawSphere(lsCtx,80,80,{nodeCount:250,detail:'medium'});
+lockS.appendChild(lsC);
+const wm2=document.createElement('span');wm2.className='wm';wm2.innerHTML='<span class="d">DEEP</span>MIRO';
+wm2.style.fontSize='1.3rem';wm2.style.letterSpacing='.12em';wm2.style.textTransform='uppercase';
+lockS.appendChild(wm2);
+const tag=document.createElement('span');tag.className='tag';tag.textContent='SWARM INTELLIGENCE ENGINE';
+lockS.appendChild(tag);
+
+// Scales
+const scales=[
+  {id:'s128',w:128,h:128,nodes:300,detail:'medium'},
+  {id:'s64',w:64,h:64,nodes:150,detail:'simple'},
+  {id:'s48',w:48,h:48,nodes:100,detail:'simple'},
+  {id:'s32',w:32,h:32,nodes:60,detail:'icon'},
+  {id:'s16',w:16,h:16,nodes:30,detail:'icon'},
+];
+for(const s of scales){
+  const{c,ctx}=makeCanvas(s.w,s.h);
+  drawSphere(ctx,s.w,s.h,{nodeCount:s.nodes,detail:s.detail});
+  document.getElementById(s.id).appendChild(c);
+}
+
+// Mono
+const{c:monoC,ctx:monoCtx}=makeCanvas(128,128);
+drawSphere(monoCtx,128,128,{nodeCount:300,detail:'medium',mono:true});
+document.getElementById('smono').appendChild(monoC);
+
+// Light
+const{c:lightC,ctx:lightCtx}=makeCanvas(128,128);
+drawSphere(lightCtx,128,128,{nodeCount:300,detail:'medium',darkColor:true});
+document.getElementById('slight').appendChild(lightC);
+
+// Rotation variants
+const rotDiv=document.getElementById('rotations');
+const rotAngles=[
+  {rx:0.5,ry:0.8,label:'Tilt A'},
+  {rx:-0.3,ry:1.2,label:'Tilt B'},
+  {rx:0.8,ry:-0.4,label:'Tilt C'},
+  {rx:-0.6,ry:0.5,label:'Tilt D'},
+];
+for(const rot of rotAngles){
+  const col=document.createElement('div');col.className='col';
+  const lbl=document.createElement('label');lbl.textContent=rot.label;
+  col.appendChild(lbl);
+  const wrap=document.createElement('div');wrap.className='card xs';
+  const{c,ctx}=makeCanvas(120,120);
+  drawSphere(ctx,120,120,{nodeCount:300,detail:'medium',rotX:rot.rx,rotY:rot.ry});
+  wrap.appendChild(c);
+  col.appendChild(wrap);
+  rotDiv.appendChild(col);
+}
+</script>
+</body>
+</html>

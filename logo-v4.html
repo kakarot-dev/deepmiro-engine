@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepMiro — Neural Shoal v4</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#07070a;color:#e8e4de;font-family:'DM Sans',system-ui;min-height:100vh;padding:2rem}
+  h1{font-family:'Syne';font-weight:800;font-size:2.2rem;letter-spacing:-.03em;text-align:center;margin-bottom:.3rem}
+  h1 span{color:#22d3ee}
+  .sub{text-align:center;color:#4a4a58;font-family:'JetBrains Mono';font-size:.75rem;margin-bottom:3rem}
+  .section{max-width:1300px;margin:0 auto 4rem}
+  .stitle{font-family:'Syne';font-weight:700;font-size:1.1rem;color:#22d3ee;opacity:.7;margin-bottom:.3rem}
+  .sdesc{color:#7a7a8a;font-size:.82rem;max-width:700px;line-height:1.6;margin-bottom:1.5rem}
+  .card{background:#08080d;border:1px solid #16161f;border-radius:20px;display:flex;align-items:center;justify-content:center;padding:2rem;margin-bottom:1.5rem;overflow:hidden}
+  .card:hover{border-color:#22d3ee12}
+  .card.sm{padding:1.2rem;border-radius:14px}
+  .card.xs{padding:.6rem;border-radius:8px;display:inline-flex;background:#0c0c12}
+  .card.light{background:#f0ede8;border-color:#d4d0c8}
+  .row{display:flex;align-items:center;gap:2rem;flex-wrap:wrap}
+  .col{display:flex;flex-direction:column;align-items:center;gap:.5rem}
+  .col label{font-family:'JetBrains Mono';font-size:.58rem;color:#4a4a58;text-transform:uppercase;letter-spacing:.12em}
+  .lockup{display:flex;align-items:center;gap:1.2rem}
+  .wm{font-family:'Syne';font-weight:700;font-size:2rem;letter-spacing:-.03em;color:#e8e4de}
+  .wm .d{color:#22d3ee}
+  .stacked-lock{display:flex;flex-direction:column;align-items:center;gap:.5rem}
+  .stacked-lock .wm{font-size:1.4rem;letter-spacing:.12em;text-transform:uppercase}
+  .stacked-lock .tag{font-family:'JetBrains Mono';font-size:.48rem;color:#7a7a8a;letter-spacing:.25em;text-transform:uppercase}
+  hr{border:none;border-top:1px solid #16161f;margin:1rem 0 2.5rem}
+</style>
+</head>
+<body>
+
+<h1>Neural Shoal <span>v4</span></h1>
+<p class="sub">// procedurally generated &mdash; 1000+ svg elements &mdash; chaos &rarr; perfection</p>
+
+<div class="section">
+  <div class="stitle">Hero Mark</div>
+  <div class="sdesc">Every particle, connection, and fin ribbon generated algorithmically. Parametric body curves, Poisson-like particle sampling, proximity-based connections, bezier fin perturbation. The fish emerges from math.</div>
+  <div class="card" id="hero-card"></div>
+</div>
+
+<hr>
+
+<div class="section">
+  <div class="stitle">Lockups</div>
+  <div class="row" style="gap:3rem">
+    <div class="col">
+      <label>Horizontal</label>
+      <div class="card sm">
+        <div class="lockup">
+          <div id="lockup-h"></div>
+          <span class="wm"><span class="d">Deep</span>Miro</span>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <label>Stacked</label>
+      <div class="card sm">
+        <div class="stacked-lock">
+          <div id="lockup-s"></div>
+          <span class="wm"><span class="d">DEEP</span>MIRO</span>
+          <span class="tag">swarm intelligence engine</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<div class="section">
+  <div class="stitle">Scale Tests</div>
+  <div class="row">
+    <div class="col"><label>128px</label><div class="card xs" id="s128"></div></div>
+    <div class="col"><label>64px</label><div class="card xs" id="s64"></div></div>
+    <div class="col"><label>32px</label><div class="card xs" id="s32"></div></div>
+    <div class="col"><label>16px</label><div class="card xs" id="s16"></div></div>
+    <div class="col"><label>Mono</label><div class="card xs" id="smono"></div></div>
+    <div class="col"><label>Light</label><div class="card xs light" id="slight"></div></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// PARAMETRIC BETTA FISH — procedural SVG generation
+// ═══════════════════════════════════════════════════════════════════
+
+// Seeded PRNG for reproducibility
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+}
+const rng = mulberry32(42);
+const rand = (min, max) => min + rng() * (max - min);
+const randInt = (min, max) => Math.floor(rand(min, max));
+
+// ─── Fish body parametric model ───
+const W = 750, H = 440;
+const cx = 390, cy = 205;   // body center
+const bodyLen = 320;          // half-length mouth to tail
+const bodyH = 58;             // max half-height
+
+// t goes from 0 (tail) to 1 (mouth)
+function bodyProfile(t) {
+  // asymmetric profile — fatter at 40%, tapers sharply at mouth
+  const fatness = Math.sin(Math.PI * Math.pow(t, 0.65)) * (1 - 0.35 * Math.pow(t, 3));
+  return bodyH * fatness;
+}
+
+function bodyX(t) { return cx - bodyLen/2 + t * bodyLen; }
+function bodyUpperY(t) { return cy - bodyProfile(t) + 8 * Math.sin(Math.PI * t); }
+function bodyLowerY(t) { return cy + bodyProfile(t) + 8 * Math.sin(Math.PI * t); }
+function bodyMidY(t) { return (bodyUpperY(t) + bodyLowerY(t)) / 2; }
+
+function isInsideBody(x, y) {
+  const t = (x - (cx - bodyLen/2)) / bodyLen;
+  if (t < 0.02 || t > 0.98) return false;
+  const upper = bodyUpperY(t);
+  const lower = bodyLowerY(t);
+  return y > upper && y < lower;
+}
+
+function distToBody(x, y) {
+  const t = Math.max(0, Math.min(1, (x - (cx - bodyLen/2)) / bodyLen));
+  const upper = bodyUpperY(t);
+  const lower = bodyLowerY(t);
+  const mid = (upper + lower) / 2;
+  const halfH = (lower - upper) / 2;
+  if (halfH <= 0) return 999;
+  const dy = Math.abs(y - mid) - halfH;
+  if (dy < 0) return 0; // inside
+  return dy;
+}
+
+// ─── Brightness/opacity based on x-position (chaos → order) ───
+function xFactor(x) {
+  const t = (x - (cx - bodyLen/2)) / bodyLen;
+  return Math.pow(Math.max(0, Math.min(1, t)), 1.2);
+}
+
+// ─── SVG builder ───
+function svgEl(tag, attrs) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+function buildHero(color = '#22d3ee', darkColor = null) {
+  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, xmlns: 'http://www.w3.org/2000/svg' });
+
+  // Defs
+  const defs = svgEl('defs', {});
+
+  // Eye glow gradient
+  const eyeGrad = svgEl('radialGradient', { id: 'eyeG', cx: '50%', cy: '50%', r: '50%' });
+  eyeGrad.appendChild(Object.assign(svgEl('stop', { offset: '0%', 'stop-color': color, 'stop-opacity': '0.7' })));
+  eyeGrad.appendChild(Object.assign(svgEl('stop', { offset: '50%', 'stop-color': color, 'stop-opacity': '0.15' })));
+  eyeGrad.appendChild(Object.assign(svgEl('stop', { offset: '100%', 'stop-color': color, 'stop-opacity': '0' })));
+  defs.appendChild(eyeGrad);
+
+  // Glow filter
+  const filter = svgEl('filter', { id: 'glow', x: '-80%', y: '-80%', width: '260%', height: '260%' });
+  filter.appendChild(svgEl('feGaussianBlur', { in: 'SourceGraphic', stdDeviation: '5', result: 'b' }));
+  filter.appendChild(svgEl('feComposite', { in: 'SourceGraphic', in2: 'b', operator: 'over' }));
+  defs.appendChild(filter);
+
+  // Soft filter for body
+  const filter2 = svgEl('filter', { id: 'softg', x: '-50%', y: '-50%', width: '200%', height: '200%' });
+  filter2.appendChild(svgEl('feGaussianBlur', { in: 'SourceGraphic', stdDeviation: '2', result: 'b2' }));
+  filter2.appendChild(svgEl('feComposite', { in: 'SourceGraphic', in2: 'b2', operator: 'over' }));
+  defs.appendChild(filter2);
+
+  svg.appendChild(defs);
+
+  const c = color;
+
+  // ════════════════════════════════════════════════
+  // LAYER 1: CHAOS FIELD — 200 random particles
+  // ════════════════════════════════════════════════
+  const chaosG = svgEl('g', { id: 'chaos' });
+  for (let i = 0; i < 250; i++) {
+    const x = rand(5, W - 5);
+    const y = rand(5, H - 5);
+    const dist = distToBody(x, y);
+    const t = (x - (cx - bodyLen/2)) / bodyLen;
+
+    // Only draw chaos particles OUTSIDE the body
+    if (dist < 5) continue;
+
+    // Density: more particles near the fish, fewer far away
+    const proximity = Math.max(0, 1 - dist / 180);
+    if (rng() > 0.3 + proximity * 0.5) continue;
+
+    const r = rand(0.5, 1.8);
+    const opacity = rand(0.015, 0.06) * (0.3 + proximity * 0.7);
+
+    chaosG.appendChild(svgEl('circle', { cx: x, cy: y, r, fill: c, opacity }));
+  }
+  svg.appendChild(chaosG);
+
+  // ════════════════════════════════════════════════
+  // LAYER 2: CAUDAL FIN — 25 flowing bezier ribbons
+  // ════════════════════════════════════════════════
+  const caudalG = svgEl('g', { id: 'caudal' });
+  const tailX = bodyX(0.05);
+  const tailY = bodyMidY(0.05);
+
+  for (let i = 0; i < 30; i++) {
+    const angle = rand(-1.1, 1.1); // spread angle
+    const len = rand(100, 220);
+    const bend = rand(-40, 40);
+
+    const endX = tailX - len * Math.cos(angle * 0.8);
+    const endY = tailY + len * Math.sin(angle) + rand(-15, 15);
+    const cpX = tailX - len * 0.5 + bend;
+    const cpY = tailY + len * 0.4 * Math.sin(angle) + rand(-20, 20);
+
+    const d = `M ${tailX} ${tailY} Q ${cpX} ${cpY}, ${endX} ${endY}`;
+    const sw = rand(0.3, 1.2);
+    const opacity = rand(0.02, 0.09) * (1 - Math.abs(angle) / 1.5);
+
+    caudalG.appendChild(svgEl('path', { d, stroke: c, 'stroke-width': sw, fill: 'none', opacity, 'stroke-linecap': 'round' }));
+
+    // Particles along the ribbon
+    const steps = randInt(3, 8);
+    for (let s = 0; s < steps; s++) {
+      const st = rand(0.3, 1);
+      const px = tailX * (1 - st) * (1 - st) + 2 * cpX * st * (1 - st) + endX * st * st;
+      const py = tailY * (1 - st) * (1 - st) + 2 * cpY * st * (1 - st) + endY * st * st;
+      const pr = rand(0.4, 1.2);
+      const po = rand(0.02, 0.06) * (1 - st);
+      caudalG.appendChild(svgEl('circle', { cx: px, cy: py, r: pr, fill: c, opacity: po }));
+    }
+  }
+  svg.appendChild(caudalG);
+
+  // ════════════════════════════════════════════════
+  // LAYER 3: DORSAL FIN — 20 upward-flowing ribbons
+  // ════════════════════════════════════════════════
+  const dorsalG = svgEl('g', { id: 'dorsal' });
+  for (let i = 0; i < 22; i++) {
+    const startT = rand(0.2, 0.85);
+    const sx = bodyX(startT);
+    const sy = bodyUpperY(startT);
+
+    const rise = rand(40, 120) * (0.5 + startT * 0.8);
+    const drift = rand(-30, 50);
+
+    const endX = sx + drift;
+    const endY = sy - rise;
+    const cpX = sx + drift * 0.3 + rand(-15, 15);
+    const cpY = sy - rise * 0.6 + rand(-10, 10);
+
+    const d = `M ${sx} ${sy} Q ${cpX} ${cpY}, ${endX} ${endY}`;
+    const sw = rand(0.3, 1.0) * (0.4 + startT * 0.8);
+    const opacity = rand(0.02, 0.08) * (0.3 + startT * 0.9);
+
+    dorsalG.appendChild(svgEl('path', { d, stroke: c, 'stroke-width': sw, fill: 'none', opacity, 'stroke-linecap': 'round' }));
+
+    // Tip particles
+    for (let s = 0; s < randInt(2, 5); s++) {
+      const pr = rand(0.4, 1);
+      dorsalG.appendChild(svgEl('circle', {
+        cx: endX + rand(-8, 8), cy: endY + rand(-8, 5),
+        r: pr, fill: c, opacity: rand(0.02, 0.05)
+      }));
+    }
+  }
+  svg.appendChild(dorsalG);
+
+  // ════════════════════════════════════════════════
+  // LAYER 4: VENTRAL/ANAL FIN — 18 downward ribbons
+  // ════════════════════════════════════════════════
+  const ventralG = svgEl('g', { id: 'ventral' });
+  for (let i = 0; i < 18; i++) {
+    const startT = rand(0.25, 0.82);
+    const sx = bodyX(startT);
+    const sy = bodyLowerY(startT);
+
+    const drop = rand(35, 100) * (0.4 + startT * 0.7);
+    const drift = rand(-25, 40);
+
+    const endX = sx + drift;
+    const endY = sy + drop;
+    const cpX = sx + drift * 0.4 + rand(-10, 10);
+    const cpY = sy + drop * 0.6 + rand(-8, 8);
+
+    const d = `M ${sx} ${sy} Q ${cpX} ${cpY}, ${endX} ${endY}`;
+    const sw = rand(0.3, 0.9) * (0.3 + startT * 0.8);
+    const opacity = rand(0.02, 0.07) * (0.3 + startT * 0.8);
+
+    ventralG.appendChild(svgEl('path', { d, stroke: c, 'stroke-width': sw, fill: 'none', opacity, 'stroke-linecap': 'round' }));
+
+    for (let s = 0; s < randInt(2, 4); s++) {
+      ventralG.appendChild(svgEl('circle', {
+        cx: endX + rand(-6, 6), cy: endY + rand(-4, 8),
+        r: rand(0.3, 0.9), fill: c, opacity: rand(0.02, 0.04)
+      }));
+    }
+  }
+  svg.appendChild(ventralG);
+
+  // ════════════════════════════════════════════════
+  // LAYER 5: PECTORAL FIN — small cluster
+  // ════════════════════════════════════════════════
+  const pectoralG = svgEl('g', { id: 'pectoral' });
+  const pecT = 0.78;
+  const pecX = bodyX(pecT);
+  const pecY = bodyLowerY(pecT) - 5;
+  for (let i = 0; i < 8; i++) {
+    const drop = rand(20, 55);
+    const drift = rand(-10, 20);
+    const endX = pecX + drift;
+    const endY = pecY + drop;
+    const cpX = pecX + drift * 0.5;
+    const cpY = pecY + drop * 0.5 + rand(-5, 5);
+    const d = `M ${pecX} ${pecY} Q ${cpX} ${cpY}, ${endX} ${endY}`;
+    pectoralG.appendChild(svgEl('path', {
+      d, stroke: c, 'stroke-width': rand(0.3, 0.7), fill: 'none',
+      opacity: rand(0.04, 0.1), 'stroke-linecap': 'round'
+    }));
+  }
+  svg.appendChild(pectoralG);
+
+  // ════════════════════════════════════════════════
+  // LAYER 6: BODY PARTICLES — dense internal field
+  // ════════════════════════════════════════════════
+  const particles = [];
+  const bodyParticlesG = svgEl('g', { id: 'body-particles' });
+
+  // Generate particles inside and near the body
+  for (let i = 0; i < 600; i++) {
+    const t = rand(0.02, 0.98);
+    const x = bodyX(t);
+    const upper = bodyUpperY(t);
+    const lower = bodyLowerY(t);
+    const mid = (upper + lower) / 2;
+    const halfH = (lower - upper) / 2;
+
+    // Generate y with bias toward the body center
+    const ySpread = rand(-1.3, 1.3);
+    const y = mid + halfH * ySpread * (0.6 + 0.4 * rng());
+
+    const inside = Math.abs(ySpread) < 1;
+    const dist = inside ? 0 : Math.abs(ySpread - 1) * halfH;
+
+    // Skip particles too far from body
+    if (dist > 30) continue;
+
+    const xf = xFactor(x);
+    const densityThreshold = inside ? 0.15 : 0.7 + dist / 60;
+    if (rng() < densityThreshold) continue;
+
+    const r = inside
+      ? rand(1, 3.5) * (0.4 + xf * 0.8)
+      : rand(0.5, 1.5) * (0.3 + xf * 0.5);
+
+    const opacity = inside
+      ? rand(0.06, 0.35) * (0.15 + xf * 0.95)
+      : rand(0.02, 0.08) * (0.2 + xf * 0.6);
+
+    particles.push({ x, y, r, opacity, inside });
+    bodyParticlesG.appendChild(svgEl('circle', { cx: x, cy: y, r, fill: c, opacity }));
+  }
+  svg.appendChild(bodyParticlesG);
+
+  // ════════════════════════════════════════════════
+  // LAYER 7: NETWORK CONNECTIONS — proximity-based
+  // ════════════════════════════════════════════════
+  const connectionsG = svgEl('g', { id: 'connections' });
+  const insideParticles = particles.filter(p => p.inside);
+
+  for (let i = 0; i < insideParticles.length; i++) {
+    const p = insideParticles[i];
+    const xf = xFactor(p.x);
+    const maxDist = 35 - xf * 12; // tighter connections toward head
+    const maxConn = Math.floor(1 + xf * 3);
+    let conn = 0;
+
+    for (let j = i + 1; j < insideParticles.length && conn < maxConn; j++) {
+      const q = insideParticles[j];
+      const dx = p.x - q.x;
+      const dy = p.y - q.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < maxDist) {
+        const opacity = (1 - dist / maxDist) * 0.12 * (0.2 + xf * 0.9);
+        const sw = (1 - dist / maxDist) * 1.2 * (0.3 + xf * 0.8);
+        connectionsG.appendChild(svgEl('line', {
+          x1: p.x, y1: p.y, x2: q.x, y2: q.y,
+          stroke: c, 'stroke-width': Math.max(0.2, sw), opacity: Math.max(0.01, opacity)
+        }));
+        conn++;
+      }
+    }
+  }
+  svg.appendChild(connectionsG);
+
+  // ════════════════════════════════════════════════
+  // LAYER 8: BODY OUTLINE — very subtle guide
+  // ════════════════════════════════════════════════
+  const outlineG = svgEl('g', { id: 'outline' });
+  let upperPath = 'M';
+  let lowerPath = 'M';
+  for (let i = 0; i <= 40; i++) {
+    const t = 0.05 + (i / 40) * 0.9;
+    const x = bodyX(t);
+    const sep = i === 0 ? ' ' : ' L ';
+    upperPath += `${sep}${x.toFixed(1)} ${bodyUpperY(t).toFixed(1)}`;
+    lowerPath += `${sep}${x.toFixed(1)} ${bodyLowerY(t).toFixed(1)}`;
+  }
+  outlineG.appendChild(svgEl('path', { d: upperPath, stroke: c, 'stroke-width': '0.5', fill: 'none', opacity: '0.04', 'stroke-linecap': 'round' }));
+  outlineG.appendChild(svgEl('path', { d: lowerPath, stroke: c, 'stroke-width': '0.5', fill: 'none', opacity: '0.04', 'stroke-linecap': 'round' }));
+  svg.appendChild(outlineG);
+
+  // ════════════════════════════════════════════════
+  // LAYER 9: HEAD DENSE CLUSTER — extra mesh
+  // ════════════════════════════════════════════════
+  const headG = svgEl('g', { id: 'head-mesh', filter: 'url(#softg)' });
+  const headParticles = [];
+  for (let i = 0; i < 80; i++) {
+    const t = rand(0.75, 0.97);
+    const x = bodyX(t);
+    const upper = bodyUpperY(t);
+    const lower = bodyLowerY(t);
+    const mid = (upper + lower) / 2;
+    const halfH = (lower - upper) / 2;
+    const y = mid + rand(-0.8, 0.8) * halfH;
+    const r = rand(1.5, 4) * (0.6 + (t - 0.75) * 3);
+    const opacity = rand(0.15, 0.5) * (0.5 + (t - 0.75) * 4);
+    headParticles.push({ x, y, r, opacity });
+    headG.appendChild(svgEl('circle', { cx: x, cy: y, r, fill: c, opacity: Math.min(opacity, 0.6) }));
+  }
+  // Dense head connections
+  for (let i = 0; i < headParticles.length; i++) {
+    for (let j = i + 1; j < headParticles.length; j++) {
+      const a = headParticles[i], b = headParticles[j];
+      const dist = Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2);
+      if (dist < 22) {
+        const opacity = (1 - dist / 22) * 0.18;
+        headG.appendChild(svgEl('line', {
+          x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+          stroke: c, 'stroke-width': (1 - dist/22) * 1.5, opacity
+        }));
+      }
+    }
+  }
+  svg.appendChild(headG);
+
+  // ════════════════════════════════════════════════
+  // LAYER 10: THE EYE — perfection
+  // ════════════════════════════════════════════════
+  const eyeX = bodyX(0.88), eyeY = bodyMidY(0.88) - 4;
+  const eyeG = svgEl('g', { id: 'eye', filter: 'url(#glow)' });
+
+  // Outer halo rings
+  for (let i = 4; i >= 0; i--) {
+    const r = 8 + i * 5;
+    eyeG.appendChild(svgEl('circle', { cx: eyeX, cy: eyeY, r, fill: 'none', stroke: c, 'stroke-width': 0.5, opacity: 0.04 + (4-i)*0.02 }));
+  }
+  // Glow
+  eyeG.appendChild(svgEl('circle', { cx: eyeX, cy: eyeY, r: 28, fill: 'url(#eyeG)' }));
+  // Iris
+  eyeG.appendChild(svgEl('circle', { cx: eyeX, cy: eyeY, r: 11, fill: c, opacity: '0.95' }));
+  // Inner ring
+  eyeG.appendChild(svgEl('circle', { cx: eyeX, cy: eyeY, r: 15, fill: 'none', stroke: c, 'stroke-width': '0.8', opacity: '0.2' }));
+  // Highlight
+  eyeG.appendChild(svgEl('circle', { cx: eyeX - 3, cy: eyeY - 3, r: 3.5, fill: '#ffffff', opacity: '0.35' }));
+  // Tiny bright center
+  eyeG.appendChild(svgEl('circle', { cx: eyeX, cy: eyeY, r: 4, fill: '#ffffff', opacity: '0.15' }));
+
+  svg.appendChild(eyeG);
+
+  // ════════════════════════════════════════════════
+  // LAYER 11: FLOW LINES — subtle current indicators
+  // ════════════════════════════════════════════════
+  const flowG = svgEl('g', { id: 'flow' });
+  for (let i = 0; i < 12; i++) {
+    const startT = rand(0.1, 0.6);
+    const sx = bodyX(startT);
+    const sy = bodyMidY(startT) + rand(-40, 40);
+    const len = rand(60, 150);
+    const endX = sx + len;
+    const endY = sy + rand(-20, 20);
+    const cpX = sx + len * 0.5;
+    const cpY = sy + rand(-30, 30);
+    const d = `M ${sx} ${sy} Q ${cpX} ${cpY}, ${endX} ${endY}`;
+    flowG.appendChild(svgEl('path', {
+      d, stroke: c, 'stroke-width': rand(0.2, 0.5), fill: 'none',
+      opacity: rand(0.015, 0.035), 'stroke-linecap': 'round',
+      'stroke-dasharray': `${rand(2,5)} ${rand(4,10)}`
+    }));
+  }
+  svg.appendChild(flowG);
+
+  return svg;
+}
+
+// ─── Build simplified versions ───
+function buildSimplified(w, h, scale, color, particleCount) {
+  const svg = svgEl('svg', { width: w, height: h, viewBox: `0 0 ${W} ${H}` });
+  const c = color;
+
+  const defs = svgEl('defs', {});
+  const f = svgEl('filter', { id: 'gs'+scale, x: '-50%', y: '-50%', width: '200%', height: '200%' });
+  f.appendChild(svgEl('feGaussianBlur', { in: 'SourceGraphic', stdDeviation: '4', result: 'b' }));
+  f.appendChild(svgEl('feComposite', { in: 'SourceGraphic', in2: 'b', operator: 'over' }));
+  defs.appendChild(f);
+  svg.appendChild(defs);
+
+  // Tail hint
+  const tailX = bodyX(0.05), tailY = bodyMidY(0.05);
+  if (scale >= 64) {
+    svg.appendChild(svgEl('path', {
+      d: `M ${tailX} ${tailY} Q ${tailX-60} ${tailY-50}, ${tailX-120} ${tailY-80}`,
+      stroke: c, 'stroke-width': '1.5', fill: 'none', opacity: '0.05', 'stroke-linecap': 'round'
+    }));
+    svg.appendChild(svgEl('path', {
+      d: `M ${tailX} ${tailY} Q ${tailX-60} ${tailY+50}, ${tailX-120} ${tailY+80}`,
+      stroke: c, 'stroke-width': '1.5', fill: 'none', opacity: '0.05', 'stroke-linecap': 'round'
+    }));
+  }
+
+  // Body particles (simplified)
+  const steps = Math.min(particleCount, 12);
+  for (let i = 0; i < steps; i++) {
+    const t = 0.1 + (i / steps) * 0.85;
+    const x = bodyX(t);
+    const y = bodyMidY(t);
+    const xf = xFactor(x);
+    const r = (3 + xf * 8) * (scale >= 64 ? 1 : 1.5);
+    const opacity = (0.05 + xf * 0.5) * (scale >= 32 ? 1 : 1.3);
+    svg.appendChild(svgEl('circle', { cx: x, cy: y, r, fill: c, opacity: Math.min(opacity, 0.9) }));
+  }
+
+  // Eye
+  const eyeX = bodyX(0.88), eyeY = bodyMidY(0.88) - 4;
+  const eyeR = scale >= 64 ? 10 : scale >= 32 ? 14 : 18;
+  svg.appendChild(svgEl('circle', { cx: eyeX, cy: eyeY, r: eyeR * 1.8, fill: c, opacity: '0.15', filter: `url(#gs${scale})` }));
+  svg.appendChild(svgEl('circle', { cx: eyeX, cy: eyeY, r: eyeR, fill: c, opacity: '0.95' }));
+
+  return svg;
+}
+
+// ─── Render everything ───
+function render() {
+  // Hero
+  const hero = buildHero();
+  hero.setAttribute('width', '700');
+  hero.setAttribute('height', '420');
+  hero.style.maxWidth = '100%';
+  hero.style.height = 'auto';
+  document.getElementById('hero-card').appendChild(hero);
+
+  // Lockup horizontal
+  const lh = buildSimplified(150, 90, 128, '#22d3ee', 8);
+  document.getElementById('lockup-h').appendChild(lh);
+
+  // Lockup stacked
+  const ls = buildSimplified(130, 78, 128, '#22d3ee', 7);
+  document.getElementById('lockup-s').appendChild(ls);
+
+  // Scale tests
+  document.getElementById('s128').appendChild(buildSimplified(128, 76, 128, '#22d3ee', 8));
+  document.getElementById('s64').appendChild(buildSimplified(64, 38, 64, '#22d3ee', 6));
+  document.getElementById('s32').appendChild(buildSimplified(32, 19, 32, '#22d3ee', 4));
+  document.getElementById('s16').appendChild(buildSimplified(16, 16, 16, '#22d3ee', 3));
+  document.getElementById('smono').appendChild(buildSimplified(128, 76, 128, '#e8e4de', 8));
+  document.getElementById('slight').appendChild(buildSimplified(128, 76, 128, '#0e7490', 8));
+}
+
+render();
+
+// Count elements
+setTimeout(() => {
+  const total = document.querySelectorAll('#hero-card svg *').length;
+  const sub = document.querySelector('.sub');
+  sub.textContent = `// procedurally generated — ${total} svg elements — chaos → perfection`;
+}, 100);
+</script>
+
+</body>
+</html>

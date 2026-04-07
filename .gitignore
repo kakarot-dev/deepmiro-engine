@@ -34,5 +34,8 @@ MiroFish/
 # Internal planning/docs
 mcp-server/BLUEPRINT.md
 
+# Logos
+logos/
+
 # Claude project memory
 .claude/

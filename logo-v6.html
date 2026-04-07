@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepMiro — Logo Concepts v6</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#07070a;color:#e8e4de;font-family:'DM Sans',system-ui;min-height:100vh;padding:2rem 1.5rem}
+  h1{font-family:'Syne';font-weight:800;font-size:2rem;letter-spacing:-.03em;text-align:center;margin-bottom:.2rem}
+  h1 span{color:#22d3ee}
+  .sub{text-align:center;color:#4a4a58;font-family:'JetBrains Mono';font-size:.72rem;margin-bottom:2.5rem}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:2rem;max-width:1200px;margin:0 auto}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .concept{background:#0a0a0f;border:1px solid #16161f;border-radius:18px;padding:2rem;display:flex;flex-direction:column;gap:1.2rem}
+  .concept:hover{border-color:#22d3ee15}
+  .concept-head{display:flex;align-items:baseline;gap:.8rem}
+  .concept-num{font-family:'JetBrains Mono';color:#22d3ee;font-size:.7rem;opacity:.5}
+  .concept-name{font-family:'Syne';font-weight:700;font-size:1.15rem;letter-spacing:-.02em}
+  .concept-desc{color:#7a7a8a;font-size:.8rem;line-height:1.5}
+  .mark-area{display:flex;align-items:center;justify-content:center;min-height:200px}
+  .lockup-row{display:flex;align-items:center;gap:2rem;flex-wrap:wrap;justify-content:center;padding-top:.5rem;border-top:1px solid #16161f}
+  .lockup{display:flex;align-items:center;gap:.8rem}
+  .wm{font-family:'Syne';font-weight:700;font-size:1.5rem;letter-spacing:-.03em;color:#e8e4de}
+  .wm .d{color:#22d3ee}
+  .sizes{display:flex;gap:1rem;align-items:end}
+  .sizes>div{display:flex;flex-direction:column;align-items:center;gap:.3rem}
+  .sizes label{font-family:'JetBrains Mono';font-size:.5rem;color:#4a4a58;text-transform:uppercase;letter-spacing:.1em}
+</style>
+</head>
+<body>
+
+<h1>DeepMiro <span>v6</span></h1>
+<p class="sub">// no fish. pure concept: convergence, depth, emergence, prediction.</p>
+
+<div class="grid" id="grid"></div>
+
+<script>
+const NS='http://www.w3.org/2000/svg';
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+let rng=mulberry32(99);
+const R=(a,b)=>a+rng()*(b-a);
+const el=(tag,attrs={})=>{const e=document.createElementNS(NS,tag);for(const[k,v]of Object.entries(attrs))e.setAttribute(k,String(v));return e};
+const cel=(tag,attrs={})=>{const e=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==='text')e.textContent=v;else e.setAttribute(k,String(v))}return e};
+
+const C='#22d3ee';
+const S=200; // viewBox size for marks
+
+function addDefs(svg, id){
+  const defs=el('defs');
+  const rg=el('radialGradient',{id:'rg'+id,cx:'50%',cy:'50%',r:'50%'});
+  rg.appendChild(el('stop',{offset:'0%','stop-color':C,'stop-opacity':'0.8'}));
+  rg.appendChild(el('stop',{offset:'40%','stop-color':C,'stop-opacity':'0.15'}));
+  rg.appendChild(el('stop',{offset:'100%','stop-color':C,'stop-opacity':'0'}));
+  defs.appendChild(rg);
+  const f=el('filter',{id:'gl'+id,x:'-60%',y:'-60%',width:'220%',height:'220%'});
+  f.appendChild(el('feGaussianBlur',{in:'SourceGraphic',stdDeviation:'4',result:'b'}));
+  f.appendChild(el('feComposite',{in:'SourceGraphic',in2:'b',operator:'over'}));
+  defs.appendChild(f);
+  svg.appendChild(defs);
+}
+
+// ═══════════════════════════════════════════════════════
+// CONCEPT 1: THE VORTEX
+// Particles spiraling inward — a whirlpool of agents
+// converging to a focal prediction point
+// ═══════════════════════════════════════════════════════
+function buildVortex(){
+  rng=mulberry32(42);
+  const svg=el('svg',{viewBox:`0 0 ${S} ${S}`,width:180,height:180});
+  addDefs(svg,'v');
+  const cx=S/2, cy=S/2;
+
+  // Spiral arms of particles
+  for(let arm=0;arm<5;arm++){
+    const baseAngle=arm*(Math.PI*2/5)+R(-0.1,0.1);
+    const particles=40+Math.floor(R(0,15));
+
+    for(let i=0;i<particles;i++){
+      const t=i/particles; // 0=outer, 1=center
+      const radius=90*(1-Math.pow(t,0.7))+R(-3,3);
+      const angle=baseAngle+t*Math.PI*2.8+R(-0.15,0.15);
+
+      const x=cx+Math.cos(angle)*radius;
+      const y=cy+Math.sin(angle)*radius;
+
+      const size=R(0.6,1.8)+t*2;
+      const opacity=0.08+t*0.55;
+
+      svg.appendChild(el('circle',{cx:x,cy:y,r:size,fill:C,opacity:Math.min(opacity,0.7)}));
+
+      // Connections to nearby particles on same arm
+      if(i>0&&i%2===0){
+        const prevT=(i-1)/particles;
+        const prevR=90*(1-Math.pow(prevT,0.7));
+        const prevA=baseAngle+prevT*Math.PI*2.8;
+        const px=cx+Math.cos(prevA)*prevR;
+        const py=cy+Math.sin(prevA)*prevR;
+        const dist=Math.sqrt((x-px)**2+(y-py)**2);
+        if(dist<30){
+          svg.appendChild(el('line',{
+            x1:px,y1:py,x2:x,y2:y,
+            stroke:C,'stroke-width':0.3+t*0.8,
+            opacity:0.05+t*0.2
+          }));
+        }
+      }
+    }
+  }
+
+  // Center focal point
+  const eyeG=el('g',{filter:'url(#glv)'});
+  eyeG.appendChild(el('circle',{cx,cy,r:22,fill:'url(#rgv)'}));
+  eyeG.appendChild(el('circle',{cx,cy,r:8,fill:C,opacity:1}));
+  eyeG.appendChild(el('circle',{cx,cy,r:12,fill:'none',stroke:C,'stroke-width':0.8,opacity:0.3}));
+  eyeG.appendChild(el('circle',{cx:cx-2,cy:cy-2,r:2.5,fill:'#fff',opacity:0.4}));
+  svg.appendChild(eyeG);
+
+  return svg;
+}
+
+// ═══════════════════════════════════════════════════════
+// CONCEPT 2: THE DEEP LAYERS
+// Concentric rounded shapes creating a tunnel/depth effect
+// Each layer is a "deeper" level of analysis
+// ═══════════════════════════════════════════════════════
+function buildLayers(){
+  rng=mulberry32(88);
+  const svg=el('svg',{viewBox:`0 0 ${S} ${S}`,width:180,height:180});
+  addDefs(svg,'l');
+  const cx=S/2,cy=S/2;
+
+  const layers=7;
+  for(let i=0;i<layers;i++){
+    const t=i/(layers-1); // 0=outermost, 1=innermost
+    const size=85-t*60;
+    const opacity=0.08+t*0.45;
+    const sw=0.8+t*1.5;
+    const corners=18-t*10;
+
+    // Rounded rect path
+    const x=cx-size, y=cy-size*0.7;
+    const w=size*2, h=size*1.4;
+    svg.appendChild(el('rect',{
+      x,y,width:w,height:h,rx:corners,ry:corners,
+      fill:'none',stroke:C,'stroke-width':sw,opacity
+    }));
+
+    // Scatter particles along the edge
+    const perim=2*(w+h);
+    const numP=Math.floor(8+t*20);
+    for(let j=0;j<numP;j++){
+      const p=R(0,perim);
+      let px,py;
+      if(p<w){px=x+p;py=y;}
+      else if(p<w+h){px=x+w;py=y+(p-w);}
+      else if(p<2*w+h){px=x+w-(p-w-h);py=y+h;}
+      else{px=x;py=y+h-(p-2*w-h);}
+      px+=R(-4,4);py+=R(-4,4);
+
+      svg.appendChild(el('circle',{
+        cx:px,cy:py,r:R(0.5,1.5)+t*1,
+        fill:C,opacity:R(0.06,0.2)+t*0.25
+      }));
+    }
+  }
+
+  // Center point
+  const eyeG=el('g',{filter:'url(#gll)'});
+  eyeG.appendChild(el('circle',{cx,cy,r:18,fill:'url(#rgl)'}));
+  eyeG.appendChild(el('circle',{cx,cy,r:7,fill:C,opacity:1}));
+  eyeG.appendChild(el('circle',{cx:cx-2,cy:cy-1.5,r:2,fill:'#fff',opacity:0.4}));
+  svg.appendChild(eyeG);
+
+  return svg;
+}
+
+// ═══════════════════════════════════════════════════════
+// CONCEPT 3: THE EMERGENCE FIELD
+// A uniform grid of dim dots — some light up and connect
+// to form an abstract "D" shape. Order from uniformity.
+// ═══════════════════════════════════════════════════════
+function buildField(){
+  rng=mulberry32(55);
+  const svg=el('svg',{viewBox:`0 0 ${S} ${S}`,width:180,height:180});
+  addDefs(svg,'f');
+  const cx=S/2,cy=S/2;
+
+  // D-shape test function
+  function isInD(x,y){
+    const nx=(x-cx)/45;
+    const ny=(y-cy)/55;
+    // Left bar of D
+    if(nx>=-1&&nx<=-0.6&&ny>=-1&&ny<=1)return true;
+    // Curve of D
+    const angle=Math.atan2(ny,nx);
+    const dist=Math.sqrt(nx*nx+ny*ny);
+    if(angle>-Math.PI/2&&angle<Math.PI/2){
+      const targetR=0.9+0.2*Math.cos(angle);
+      if(dist>0.5&&dist<targetR+0.15)return true;
+    }
+    // Top/bottom bars connecting to curve
+    if(ny>=-1.05&&ny<=-0.8&&nx>=-1&&nx<=0.3)return true;
+    if(ny>=0.8&&ny<=1.05&&nx>=-1&&nx<=0.3)return true;
+    return false;
+  }
+
+  const gridSize=14;
+  const spacing=S/(gridSize+1);
+  const activePts=[];
+  const bgPts=[];
+
+  for(let gx=1;gx<=gridSize;gx++){
+    for(let gy=1;gy<=gridSize;gy++){
+      const x=gx*spacing;
+      const y=gy*spacing;
+      const active=isInD(x,y);
+
+      if(active){
+        const r=R(1.5,3);
+        const opacity=R(0.4,0.8);
+        svg.appendChild(el('circle',{cx:x,cy:y,r,fill:C,opacity}));
+        activePts.push({x,y});
+      }else{
+        const r=R(0.5,1.2);
+        svg.appendChild(el('circle',{cx:x,cy:y,r,fill:C,opacity:R(0.04,0.1)}));
+        bgPts.push({x,y});
+      }
+    }
+  }
+
+  // Connect active dots
+  for(let i=0;i<activePts.length;i++){
+    for(let j=i+1;j<activePts.length;j++){
+      const a=activePts[i],b=activePts[j];
+      const dist=Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2);
+      if(dist<spacing*1.8){
+        svg.appendChild(el('line',{
+          x1:a.x,y1:a.y,x2:b.x,y2:b.y,
+          stroke:C,'stroke-width':(1-dist/(spacing*1.8))*1.2,
+          opacity:(1-dist/(spacing*1.8))*0.3
+        }));
+      }
+    }
+  }
+
+  // Subtle glow on the D
+  const glowG=el('g',{filter:'url(#glf)',opacity:'0.3'});
+  for(const p of activePts){
+    glowG.appendChild(el('circle',{cx:p.x,cy:p.y,r:3,fill:C,opacity:0.3}));
+  }
+  svg.appendChild(glowG);
+
+  return svg;
+}
+
+// ═══════════════════════════════════════════════════════
+// CONCEPT 4: THE CONVERGENCE BURST
+// Lines streaming from all directions toward a center,
+// creating a starburst/implosion effect.
+// Many → One. Agents → Prediction.
+// ═══════════════════════════════════════════════════════
+function buildBurst(){
+  rng=mulberry32(33);
+  const svg=el('svg',{viewBox:`0 0 ${S} ${S}`,width:180,height:180});
+  addDefs(svg,'b');
+  const cx=S/2,cy=S/2;
+
+  // Convergence lines from edges
+  for(let i=0;i<60;i++){
+    const angle=R(0,Math.PI*2);
+    const outerR=R(75,98);
+    const innerR=R(12,25);
+
+    const ox=cx+Math.cos(angle)*outerR;
+    const oy=cy+Math.sin(angle)*outerR;
+    const ix=cx+Math.cos(angle+R(-0.1,0.1))*innerR;
+    const iy=cy+Math.sin(angle+R(-0.1,0.1))*innerR;
+
+    // Tapered line — thicker at outside, thin at center
+    const sw=R(0.3,2);
+    const opacity=R(0.08,0.35);
+
+    svg.appendChild(el('line',{
+      x1:ox,y1:oy,x2:ix,y2:iy,
+      stroke:C,'stroke-width':sw,opacity,
+      'stroke-linecap':'round'
+    }));
+
+    // Particle at origin point
+    svg.appendChild(el('circle',{
+      cx:ox+R(-3,3),cy:oy+R(-3,3),
+      r:R(0.5,2),fill:C,opacity:R(0.1,0.3)
+    }));
+  }
+
+  // Inner ring of bright dots
+  for(let i=0;i<16;i++){
+    const angle=i*(Math.PI*2/16)+R(-0.1,0.1);
+    const r=20+R(-3,3);
+    svg.appendChild(el('circle',{
+      cx:cx+Math.cos(angle)*r,
+      cy:cy+Math.sin(angle)*r,
+      r:R(1,2.5),fill:C,opacity:R(0.3,0.6)
+    }));
+  }
+
+  // Center
+  const eyeG=el('g',{filter:'url(#glb)'});
+  eyeG.appendChild(el('circle',{cx,cy,r:20,fill:'url(#rgb)'}));
+  eyeG.appendChild(el('circle',{cx,cy,r:8,fill:C,opacity:1}));
+  eyeG.appendChild(el('circle',{cx,cy,r:12,fill:'none',stroke:C,'stroke-width':1,opacity:0.3}));
+  eyeG.appendChild(el('circle',{cx:cx-2,cy:cy-2,r:2.5,fill:'#fff',opacity:0.45}));
+  svg.appendChild(eyeG);
+
+  return svg;
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER CONCEPTS
+// ═══════════════════════════════════════════════════════
+const concepts=[
+  {
+    num:'01',name:'The Vortex',
+    desc:'Particles spiraling inward — a whirlpool of agents converging to a focal prediction. Five spiral arms create rhythm and motion. The center glows: the singular insight.',
+    build:buildVortex
+  },
+  {
+    num:'02',name:'The Deep Layers',
+    desc:'Concentric rounded frames creating a tunnel into depth. Each layer is a deeper level of analysis. Particles scatter along each level. The innermost point is the prediction.',
+    build:buildLayers
+  },
+  {
+    num:'03',name:'The Emergence Field',
+    desc:'A uniform grid of dim dots — the raw agent field. Some light up and connect to form a "D" shape. Order emerging from uniformity. The logo IS the product metaphor.',
+    build:buildField
+  },
+  {
+    num:'04',name:'The Convergence Burst',
+    desc:'60 lines streaming from all directions toward a center point. Many → One. Agents → Prediction. The simplest possible expression of swarm convergence.',
+    build:buildBurst
+  }
+];
+
+const grid=document.getElementById('grid');
+
+for(const c of concepts){
+  const card=cel('div',{class:'concept'});
+
+  // Header
+  const head=cel('div',{class:'concept-head'});
+  head.appendChild(cel('span',{class:'concept-num',text:c.num}));
+  head.appendChild(cel('span',{class:'concept-name',text:c.name}));
+  card.appendChild(head);
+
+  // Desc
+  card.appendChild(cel('p',{class:'concept-desc',text:c.desc}));
+
+  // Mark
+  const markArea=cel('div',{class:'mark-area'});
+  markArea.appendChild(c.build());
+  card.appendChild(markArea);
+
+  // Lockup + sizes
+  const lockRow=cel('div',{class:'lockup-row'});
+
+  // Horizontal lockup
+  const lockup=cel('div',{class:'lockup'});
+  const smallMark=c.build();
+  smallMark.setAttribute('width','36');
+  smallMark.setAttribute('height','36');
+  lockup.appendChild(smallMark);
+  const wm=cel('span',{class:'wm'});
+  wm.innerHTML='<span class="d">Deep</span>Miro';
+  lockup.appendChild(wm);
+  lockRow.appendChild(lockup);
+
+  // Sizes
+  const sizes=cel('div',{class:'sizes'});
+  for(const sz of [32,16]){
+    const col=cel('div');
+    col.appendChild(cel('label',{text:sz+'px'}));
+    const m=c.build();
+    m.setAttribute('width',String(sz));
+    m.setAttribute('height',String(sz));
+    col.appendChild(m);
+    sizes.appendChild(col);
+  }
+  lockRow.appendChild(sizes);
+
+  card.appendChild(lockRow);
+  grid.appendChild(card);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepMiro — Logo Canvas v7</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#07070a;color:#e8e4de;font-family:'DM Sans',system-ui;min-height:100vh;padding:2rem}
+  h1{font-family:'Syne';font-weight:800;font-size:2rem;letter-spacing:-.03em;text-align:center;margin-bottom:.2rem}
+  h1 span{color:#22d3ee}
+  .sub{text-align:center;color:#4a4a58;font-family:'JetBrains Mono';font-size:.72rem;margin-bottom:2.5rem}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:2rem;max-width:1300px;margin:0 auto}
+  @media(max-width:950px){.grid{grid-template-columns:1fr}}
+  .concept{background:#0a0a0f;border:1px solid #16161f;border-radius:18px;padding:1.8rem;display:flex;flex-direction:column;gap:1rem}
+  .concept:hover{border-color:#22d3ee15}
+  .concept-head{display:flex;align-items:baseline;gap:.7rem}
+  .cnum{font-family:'JetBrains Mono';color:#22d3ee;font-size:.65rem;opacity:.5}
+  .cname{font-family:'Syne';font-weight:700;font-size:1.1rem;letter-spacing:-.02em}
+  .cdesc{color:#7a7a8a;font-size:.78rem;line-height:1.5}
+  .mark-wrap{display:flex;align-items:center;justify-content:center;padding:.5rem 0}
+  canvas{border-radius:8px}
+  .lock-row{display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;justify-content:center;padding-top:.8rem;border-top:1px solid #16161f}
+  .lockup{display:flex;align-items:center;gap:.7rem}
+  .wm{font-family:'Syne';font-weight:700;font-size:1.4rem;letter-spacing:-.03em;color:#e8e4de}
+  .wm .d{color:#22d3ee}
+  .sz-row{display:flex;gap:.8rem;align-items:end}
+  .sz-col{display:flex;flex-direction:column;align-items:center;gap:.25rem}
+  .sz-col label{font-family:'JetBrains Mono';font-size:.48rem;color:#4a4a58;text-transform:uppercase;letter-spacing:.1em}
+</style>
+</head>
+<body>
+
+<h1>DeepMiro <span>v7 Canvas</span></h1>
+<p class="sub">// canvas rendering &mdash; anti-aliased, layered, glowing</p>
+
+<div class="grid" id="grid"></div>
+
+<script>
+// ── PRNG ──
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+let seed;
+function resetRng(s){seed=mulberry32(s)}
+function R(a,b){return a+seed()*(b-a)}
+function RI(a,b){return Math.floor(R(a,b))}
+
+const CYAN='#22d3ee';
+const rgb=(r,g,b,a)=>`rgba(${r},${g},${b},${a})`;
+const cyan=(a)=>rgb(34,211,238,a);
+
+function createCanvas(w,h,dpr=2){
+  const c=document.createElement('canvas');
+  c.width=w*dpr;c.height=h*dpr;
+  c.style.width=w+'px';c.style.height=h+'px';
+  const ctx=c.getContext('2d');
+  ctx.scale(dpr,dpr);
+  return{c,ctx,w,h};
+}
+
+// ─── Glow helper ───
+function drawGlow(ctx,x,y,r,alpha){
+  const grad=ctx.createRadialGradient(x,y,0,x,y,r);
+  grad.addColorStop(0,cyan(alpha));
+  grad.addColorStop(0.4,cyan(alpha*0.3));
+  grad.addColorStop(1,cyan(0));
+  ctx.fillStyle=grad;
+  ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+}
+
+function drawEye(ctx,x,y,r){
+  // Outer glow
+  drawGlow(ctx,x,y,r*4,0.5);
+  // Halo rings
+  for(let i=3;i>=0;i--){
+    ctx.strokeStyle=cyan(0.06+i*0.04);
+    ctx.lineWidth=0.6;
+    ctx.beginPath();ctx.arc(x,y,r+i*4+4,0,Math.PI*2);ctx.stroke();
+  }
+  // Iris
+  ctx.fillStyle=cyan(1);
+  ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+  // Inner ring
+  ctx.strokeStyle=cyan(0.3);ctx.lineWidth=0.8;
+  ctx.beginPath();ctx.arc(x,y,r*1.4,0,Math.PI*2);ctx.stroke();
+  // Highlight
+  ctx.fillStyle=`rgba(255,255,255,0.45)`;
+  ctx.beginPath();ctx.arc(x-r*0.25,y-r*0.25,r*0.32,0,Math.PI*2);ctx.fill();
+}
+
+// ═══════════════════════════════════════════════════════
+// 1. THE VORTEX
+// ═══════════════════════════════════════════════════════
+function drawVortex(ctx,w,h){
+  resetRng(42);
+  const cx=w/2,cy=h/2;
+  const maxR=Math.min(w,h)*0.44;
+
+  // 8 spiral arms
+  for(let arm=0;arm<8;arm++){
+    const baseA=arm*(Math.PI*2/8);
+
+    for(let i=0;i<80;i++){
+      const t=i/80;
+      const radius=maxR*(1-Math.pow(t,0.6));
+      const angle=baseA+t*Math.PI*3.5+R(-0.1,0.1);
+
+      const x=cx+Math.cos(angle)*radius;
+      const y=cy+Math.sin(angle)*radius;
+      const size=0.4+t*3.5;
+      const alpha=0.05+t*0.65;
+
+      ctx.fillStyle=cyan(Math.min(alpha,0.75));
+      ctx.beginPath();ctx.arc(x,y,size,0,Math.PI*2);ctx.fill();
+
+      // Trail connections — every particle
+      if(i>0){
+        const pt=(i-1)/80;
+        const pr=maxR*(1-Math.pow(pt,0.6));
+        const pa=baseA+pt*Math.PI*3.5;
+        const px=cx+Math.cos(pa)*pr;
+        const py=cy+Math.sin(pa)*pr;
+
+        ctx.strokeStyle=cyan(0.02+t*0.2);
+        ctx.lineWidth=0.2+t*0.9;
+        ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(x,y);ctx.stroke();
+      }
+
+      // Cross-arm connections — link to nearby particles on adjacent arms
+      if(i>20&&i%5===0){
+        const nextArm=(arm+1)%8;
+        const na=nextArm*(Math.PI*2/8)+t*Math.PI*3.5;
+        const nr=maxR*(1-Math.pow(t,0.6));
+        const nx=cx+Math.cos(na)*nr;
+        const ny=cy+Math.sin(na)*nr;
+        ctx.strokeStyle=cyan(0.02+t*0.08);
+        ctx.lineWidth=0.15+t*0.4;
+        ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(nx,ny);ctx.stroke();
+      }
+    }
+  }
+
+  // Secondary particle haze between arms
+  for(let i=0;i<150;i++){
+    const a=R(0,Math.PI*2);
+    const dist=R(maxR*0.1,maxR*0.9);
+    const t=1-dist/maxR;
+    const x=cx+Math.cos(a)*dist;
+    const y=cy+Math.sin(a)*dist;
+    ctx.fillStyle=cyan(R(0.02,0.08)+t*0.12);
+    ctx.beginPath();ctx.arc(x,y,R(0.3,1.2)+t*0.8,0,Math.PI*2);ctx.fill();
+  }
+
+  // Outer stray particles
+  for(let i=0;i<60;i++){
+    const a=R(0,Math.PI*2);
+    const r=R(maxR*0.85,maxR*1.15);
+    ctx.fillStyle=cyan(R(0.03,0.12));
+    ctx.beginPath();ctx.arc(cx+Math.cos(a)*r,cy+Math.sin(a)*r,R(0.4,1.8),0,Math.PI*2);ctx.fill();
+  }
+
+  // Inner ring of bright converging dots
+  for(let i=0;i<24;i++){
+    const a=i*(Math.PI*2/24)+R(-0.05,0.05);
+    const r2=maxR*0.15+R(-2,2);
+    ctx.fillStyle=cyan(R(0.3,0.6));
+    ctx.beginPath();ctx.arc(cx+Math.cos(a)*r2,cy+Math.sin(a)*r2,R(1,2.5),0,Math.PI*2);ctx.fill();
+  }
+
+  drawEye(ctx,cx,cy,7);
+}
+
+// ═══════════════════════════════════════════════════════
+// 2. THE CONVERGENCE BURST
+// ═══════════════════════════════════════════════════════
+function drawBurst(ctx,w,h){
+  resetRng(33);
+  const cx=w/2,cy=h/2;
+  const maxR=Math.min(w,h)*0.46;
+
+  // 160 converging lines with curved paths
+  for(let i=0;i<160;i++){
+    const angle=R(0,Math.PI*2);
+    const outerR=R(maxR*0.6,maxR);
+    const innerR=R(8,20);
+
+    const ox=cx+Math.cos(angle)*outerR;
+    const oy=cy+Math.sin(angle)*outerR;
+    const ix=cx+Math.cos(angle+R(-0.06,0.06))*innerR;
+    const iy=cy+Math.sin(angle+R(-0.06,0.06))*innerR;
+
+    // Curved path with control point offset
+    const midR=(outerR+innerR)/2;
+    const cpAngle=angle+R(-0.3,0.3);
+    const cpx=cx+Math.cos(cpAngle)*midR*R(0.4,0.7);
+    const cpy=cy+Math.sin(cpAngle)*midR*R(0.4,0.7);
+
+    const grad=ctx.createLinearGradient(ox,oy,ix,iy);
+    grad.addColorStop(0,cyan(R(0.12,0.45)));
+    grad.addColorStop(0.6,cyan(R(0.03,0.12)));
+    grad.addColorStop(1,cyan(0));
+
+    ctx.strokeStyle=grad;
+    ctx.lineWidth=R(0.2,1.6);
+    ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(ox,oy);ctx.quadraticCurveTo(cpx,cpy,ix,iy);ctx.stroke();
+
+    // Particle at origin
+    ctx.fillStyle=cyan(R(0.08,0.35));
+    ctx.beginPath();ctx.arc(ox+R(-3,3),oy+R(-3,3),R(0.4,2.5),0,Math.PI*2);ctx.fill();
+
+    // Mid-path particle
+    if(i%3===0){
+      const mt=0.4+R(0,0.2);
+      const mx=(1-mt)*(1-mt)*ox+2*(1-mt)*mt*cpx+mt*mt*ix;
+      const my=(1-mt)*(1-mt)*oy+2*(1-mt)*mt*cpy+mt*mt*iy;
+      ctx.fillStyle=cyan(R(0.05,0.15));
+      ctx.beginPath();ctx.arc(mx,my,R(0.3,1.2),0,Math.PI*2);ctx.fill();
+    }
+  }
+
+  // Outer haze ring
+  for(let i=0;i<80;i++){
+    const a=R(0,Math.PI*2);
+    const r2=maxR+R(-8,15);
+    ctx.fillStyle=cyan(R(0.02,0.08));
+    ctx.beginPath();ctx.arc(cx+Math.cos(a)*r2,cy+Math.sin(a)*r2,R(0.3,1.5),0,Math.PI*2);ctx.fill();
+  }
+
+  // Two inner bright rings
+  for(let ring=0;ring<2;ring++){
+    const ringR=14+ring*8;
+    const count=16+ring*8;
+    for(let i=0;i<count;i++){
+      const a=i*(Math.PI*2/count)+R(-0.06,0.06);
+      const r=ringR+R(-2,2);
+      ctx.fillStyle=cyan(R(0.2,0.5)*(1-ring*0.3));
+      ctx.beginPath();ctx.arc(cx+Math.cos(a)*r,cy+Math.sin(a)*r,R(0.8,2.5),0,Math.PI*2);ctx.fill();
+    }
+  }
+
+  drawEye(ctx,cx,cy,7);
+}
+
+// ═══════════════════════════════════════════════════════
+// 3. THE NETWORK SPHERE
+// Dots on a sphere surface (projected), connected —
+// like a globe of agents. Depth through size/opacity.
+// ═══════════════════════════════════════════════════════
+function drawSphere(ctx,w,h){
+  resetRng(66);
+  const cx=w/2,cy=h/2;
+  const radius=Math.min(w,h)*0.38;
+
+  // Generate points on sphere using fibonacci sphere — 300 points
+  const pts=[];
+  const n=300;
+  const goldenAngle=Math.PI*(3-Math.sqrt(5));
+
+  for(let i=0;i<n;i++){
+    const t=i/(n-1);
+    const inclination=Math.acos(1-2*t);
+    const azimuth=goldenAngle*i;
+
+    const x3d=Math.sin(inclination)*Math.cos(azimuth);
+    const y3d=Math.sin(inclination)*Math.sin(azimuth);
+    const z3d=Math.cos(inclination);
+
+    const perspective=1/(1.8-z3d*0.5);
+    const px=cx+x3d*radius*perspective;
+    const py=cy+y3d*radius*perspective;
+    const depth=(z3d+1)/2;
+
+    pts.push({x:px,y:py,z:z3d,depth,size:0.6+depth*3.5,alpha:0.04+depth*0.6});
+  }
+
+  pts.sort((a,b)=>a.z-b.z);
+
+  // Latitude rings
+  for(let lat=-3;lat<=3;lat++){
+    const y3=lat/4;
+    const ringR=Math.sqrt(1-y3*y3)*radius;
+    const projY=cy+y3*radius*0.85;
+    ctx.strokeStyle=cyan(0.03+Math.abs(y3)<0.3?0.04:0);
+    ctx.lineWidth=0.4;
+    ctx.beginPath();ctx.ellipse(cx,projY,ringR,ringR*0.25,0,0,Math.PI*2);ctx.stroke();
+  }
+
+  // Longitude arcs
+  for(let lon=0;lon<6;lon++){
+    const a=lon*(Math.PI/6);
+    ctx.strokeStyle=cyan(0.025);
+    ctx.lineWidth=0.3;
+    ctx.beginPath();
+    for(let s=0;s<=40;s++){
+      const inc=s/40*Math.PI;
+      const x3=Math.sin(inc)*Math.cos(a);
+      const y3=Math.cos(inc);
+      const z3=Math.sin(inc)*Math.sin(a);
+      const p=1/(1.8-z3*0.5);
+      const sx=cx+x3*radius*p;
+      const sy=cy+y3*radius*p;
+      if(s===0)ctx.moveTo(sx,sy);else ctx.lineTo(sx,sy);
+    }
+    ctx.stroke();
+  }
+
+  // Connections — more per node
+  for(let i=0;i<pts.length;i++){
+    const a=pts[i];
+    let conns=0;
+    for(let j=i+1;j<pts.length&&conns<4;j++){
+      const b=pts[j];
+      const dist=Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2);
+      if(dist<radius*0.28){
+        const avgDepth=(a.depth+b.depth)/2;
+        ctx.strokeStyle=cyan(0.015+avgDepth*0.18);
+        ctx.lineWidth=0.15+avgDepth*0.9;
+        ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+        conns++;
+      }
+    }
+  }
+
+  // Dots
+  for(const p of pts){
+    ctx.fillStyle=cyan(p.alpha);
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();
+  }
+
+  // Atmosphere haze
+  drawGlow(ctx,cx,cy,radius*1.15,0.06);
+
+  // Equator ring glow
+  ctx.strokeStyle=cyan(0.08);
+  ctx.lineWidth=1.2;
+  ctx.beginPath();ctx.ellipse(cx,cy,radius,radius*0.28,0,0,Math.PI*2);ctx.stroke();
+
+  // Orbiting particles
+  for(let i=0;i<20;i++){
+    const a=R(0,Math.PI*2);
+    const orbitR=radius*R(1.05,1.2);
+    ctx.fillStyle=cyan(R(0.06,0.15));
+    ctx.beginPath();ctx.arc(cx+Math.cos(a)*orbitR,cy+Math.sin(a)*orbitR*0.3,R(0.5,1.5),0,Math.PI*2);ctx.fill();
+  }
+
+  drawEye(ctx,cx,cy,6);
+}
+
+// ═══════════════════════════════════════════════════════
+// 4. THE MIRROR SPLIT
+// Two halves — left is chaotic noise, right is structured
+// geometry. The center line is the mirror/prediction axis.
+// ═══════════════════════════════════════════════════════
+function drawMirror(ctx,w,h){
+  resetRng(77);
+  const cx=w/2,cy=h/2;
+  const r=Math.min(w,h)*0.42;
+
+  // Outer circle boundary
+  ctx.strokeStyle=cyan(0.12);
+  ctx.lineWidth=1;
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();
+
+  // Mirror axis (vertical center)
+  ctx.strokeStyle=cyan(0.08);
+  ctx.lineWidth=0.5;
+  ctx.setLineDash([3,5]);
+  ctx.beginPath();ctx.moveTo(cx,cy-r-5);ctx.lineTo(cx,cy+r+5);ctx.stroke();
+  ctx.setLineDash([]);
+
+  // LEFT HALF — dense chaos
+  for(let i=0;i<500;i++){
+    const x=R(cx-r,cx-2);
+    const y=R(cy-r,cy+r);
+    if(Math.sqrt((x-cx)**2+(y-cy)**2)>r-2)continue;
+
+    const proximity=1-Math.abs(x-cx)/r;
+    ctx.fillStyle=cyan(R(0.02,0.1)+proximity*0.12);
+    ctx.beginPath();ctx.arc(x,y,R(0.2,1.8),0,Math.PI*2);ctx.fill();
+  }
+
+  // Chaotic connections on left
+  for(let i=0;i<80;i++){
+    const x1=R(cx-r*0.9,cx-5);
+    const y1=R(cy-r*0.85,cy+r*0.85);
+    const x2=x1+R(-25,25);
+    const y2=y1+R(-25,25);
+    if(Math.sqrt((x1-cx)**2+(y1-cy)**2)>r)continue;
+    ctx.strokeStyle=cyan(R(0.02,0.08));
+    ctx.lineWidth=R(0.15,0.6);
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  }
+
+  // Chaotic bezier curves on left
+  for(let i=0;i<30;i++){
+    const x1=R(cx-r*0.8,cx-10);
+    const y1=R(cy-r*0.7,cy+r*0.7);
+    if(Math.sqrt((x1-cx)**2+(y1-cy)**2)>r)continue;
+    const x2=x1+R(-30,15);
+    const y2=y1+R(-30,30);
+    const cpx=x1+R(-20,10);
+    const cpy=y1+R(-20,20);
+    ctx.strokeStyle=cyan(R(0.03,0.06));
+    ctx.lineWidth=R(0.2,0.5);
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.quadraticCurveTo(cpx,cpy,x2,y2);ctx.stroke();
+  }
+
+  // RIGHT HALF — dense structured hexagonal grid
+  const hexR=9;
+  const hexH=hexR*Math.sqrt(3);
+
+  const rightPts=[];
+  for(let row=-9;row<=9;row++){
+    for(let col=0;col<=10;col++){
+      const x=cx+4+col*hexR*1.5;
+      const y=cy+row*hexH/2+(col%2)*hexH/4;
+      const d=Math.sqrt((x-cx)**2+(y-cy)**2);
+      if(d>r-4)continue;
+      if(x<cx+2)continue;
+
+      const distFromCenter=d/r;
+      const alpha=0.12+(1-distFromCenter)*0.55;
+      const size=0.8+(1-distFromCenter)*2.2;
+
+      rightPts.push({x,y,alpha,size,distFromCenter});
+
+      ctx.fillStyle=cyan(alpha);
+      ctx.beginPath();ctx.arc(x,y,size,0,Math.PI*2);ctx.fill();
+
+      // Connect to right neighbor
+      const nx=x+hexR*1.5;
+      const ny1=y-hexH/4;
+      const ny2=y+hexH/4;
+      if(Math.sqrt((nx-cx)**2+(ny1-cy)**2)<r-4&&nx>cx){
+        ctx.strokeStyle=cyan(alpha*0.4);
+        ctx.lineWidth=0.2+(1-distFromCenter)*0.7;
+        ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(nx,ny1);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(nx,ny2);ctx.stroke();
+      }
+      // Vertical
+      const vy=y+hexH/2;
+      if(Math.sqrt((x-cx)**2+(vy-cy)**2)<r-4){
+        ctx.strokeStyle=cyan(alpha*0.35);
+        ctx.lineWidth=0.2+(1-distFromCenter)*0.5;
+        ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,vy);ctx.stroke();
+      }
+    }
+  }
+
+  // Glow overlay on right side nodes near center
+  for(const p of rightPts){
+    if(p.distFromCenter<0.4){
+      drawGlow(ctx,p.x,p.y,6,(1-p.distFromCenter)*0.08);
+    }
+  }
+
+  // Center glow on the axis
+  drawGlow(ctx,cx,cy,r*0.4,0.25);
+  drawEye(ctx,cx,cy,5);
+}
+
+// ═══════════════════════════════════════════════════════
+// 5. THE DEEP RIPPLE
+// Concentric circles like a stone dropped in water,
+// but particles cluster densely at the center —
+// prediction rippling outward from a core insight.
+// ═══════════════════════════════════════════════════════
+function drawRipple(ctx,w,h){
+  resetRng(21);
+  const cx=w/2,cy=h/2;
+  const maxR=Math.min(w,h)*0.44;
+
+  // 14 ripple rings
+  const rings=14;
+  for(let i=rings;i>=0;i--){
+    const t=i/rings;
+    const radius=maxR*t;
+    const alpha=0.04+(1-t)*0.35;
+    const lw=0.3+(1-t)*1.8;
+
+    // Ring with organic wobble
+    ctx.strokeStyle=cyan(alpha);
+    ctx.lineWidth=lw;
+    ctx.beginPath();
+    for(let a=0;a<=360;a+=1){
+      const rad=a*Math.PI/180;
+      const wobble=R(-2,2)*(t*0.6);
+      const r2=radius+wobble;
+      const x=cx+Math.cos(rad)*r2;
+      const y=cy+Math.sin(rad)*r2;
+      if(a===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    }
+    ctx.closePath();ctx.stroke();
+
+    // Glow behind each ring
+    if(t<0.7){
+      drawGlow(ctx,cx,cy,radius+5,(1-t)*0.04);
+    }
+
+    // Dense particles along ring
+    const numP=Math.floor(8+t*40);
+    for(let j=0;j<numP;j++){
+      const a=R(0,Math.PI*2);
+      const px=cx+Math.cos(a)*(radius+R(-5,5));
+      const py=cy+Math.sin(a)*(radius+R(-5,5));
+      const pSize=R(0.3,1.5)+(1-t)*1.8;
+      const pAlpha=R(0.04,0.15)+(1-t)*0.45;
+
+      ctx.fillStyle=cyan(Math.min(pAlpha,0.65));
+      ctx.beginPath();ctx.arc(px,py,pSize,0,Math.PI*2);ctx.fill();
+    }
+
+    // Radial connector lines between rings
+    if(i<rings&&i>0){
+      const outerR=maxR*((i+1)/rings);
+      const connCount=Math.floor(4+t*8);
+      for(let j=0;j<connCount;j++){
+        const a=R(0,Math.PI*2);
+        const x1=cx+Math.cos(a)*radius;
+        const y1=cy+Math.sin(a)*radius;
+        const x2=cx+Math.cos(a+R(-0.1,0.1))*outerR;
+        const y2=cy+Math.sin(a+R(-0.1,0.1))*outerR;
+        ctx.strokeStyle=cyan(0.02+(1-t)*0.08);
+        ctx.lineWidth=0.2+(1-t)*0.5;
+        ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+      }
+    }
+  }
+
+  // Dense center cluster
+  for(let i=0;i<80;i++){
+    const a=R(0,Math.PI*2);
+    const r2=R(0,maxR*0.15);
+    const x=cx+Math.cos(a)*r2;
+    const y=cy+Math.sin(a)*r2;
+    const t=1-r2/(maxR*0.15);
+    ctx.fillStyle=cyan(R(0.2,0.6)+t*0.2);
+    ctx.beginPath();ctx.arc(x,y,R(0.8,3),0,Math.PI*2);ctx.fill();
+  }
+
+  drawEye(ctx,cx,cy,7);
+}
+
+// ═══════════════════════════════════════════════════════
+// 6. THE CONSTELLATION D
+// Stars forming a "D" monogram with constellation lines.
+// Clean, minimal, ownable.
+// ═══════════════════════════════════════════════════════
+function drawConstellationD(ctx,w,h){
+  resetRng(55);
+  const cx=w/2,cy=h/2;
+  const scale=Math.min(w,h)*0.4;
+
+  // Define anchor points of a "D" shape — more points for smoother curve
+  const anchors=[
+    // Vertical bar (left side)
+    {x:-0.5,y:-0.9},{x:-0.5,y:-0.6},{x:-0.5,y:-0.3},{x:-0.5,y:0},
+    {x:-0.5,y:0.3},{x:-0.5,y:0.6},{x:-0.5,y:0.9},
+    // Curve (right side) — more points for smooth arc
+    {x:-0.15,y:-0.9},{x:0.15,y:-0.82},{x:0.38,y:-0.65},{x:0.55,y:-0.42},
+    {x:0.65,y:-0.15},{x:0.7,y:0.1},{x:0.65,y:0.35},
+    {x:0.55,y:0.55},{x:0.38,y:0.72},{x:0.15,y:0.85},{x:-0.15,y:0.9},
+    // Interior secondary points
+    {x:-0.2,y:-0.45},{x:0.1,y:-0.35},{x:0.3,y:-0.1},
+    {x:0.35,y:0.2},{x:0.15,y:0.45},{x:-0.15,y:0.5},
+    {x:-0.2,y:0},{x:0.1,y:0.1},
+  ];
+
+  const pts=anchors.map(p=>({
+    x:cx+p.x*scale+R(-1.5,1.5),
+    y:cy+p.y*scale+R(-1.5,1.5),
+    ox:p.x,oy:p.y
+  }));
+
+  // Dense background star field
+  for(let i=0;i<200;i++){
+    const x=cx+R(-scale*1.3,scale*1.3);
+    const y=cy+R(-scale*1.3,scale*1.3);
+    ctx.fillStyle=cyan(R(0.015,0.055));
+    ctx.beginPath();ctx.arc(x,y,R(0.2,0.9),0,Math.PI*2);ctx.fill();
+  }
+
+  // Constellation lines — connect nearby anchor points
+  const connections=[
+    // Vertical bar
+    [0,1],[1,2],[2,3],[3,4],[4,5],[5,6],
+    // Outer curve
+    [0,7],[7,8],[8,9],[9,10],[10,11],[11,12],[12,13],[13,14],[14,15],[15,16],[16,17],[17,6],
+    // Cross braces
+    [1,8],[2,9],[3,12],[4,14],[5,16],
+    // Inner web
+    [7,1],[17,5],
+    [2,18],[18,19],[19,20],[20,3],
+    [3,24],[24,25],
+    [20,21],[21,22],[22,23],[23,4],
+    [19,11],[21,13],
+    [18,9],[23,15],
+    [24,12],[25,22],
+  ];
+
+  // Glow lines first (behind)
+  for(const[a,b]of connections){
+    if(a>=pts.length||b>=pts.length)continue;
+    const p1=pts[a],p2=pts[b];
+    ctx.strokeStyle=cyan(0.04);
+    ctx.lineWidth=4;
+    ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke();
+  }
+  // Sharp lines on top
+  for(const[a,b]of connections){
+    if(a>=pts.length||b>=pts.length)continue;
+    const p1=pts[a],p2=pts[b];
+    ctx.strokeStyle=cyan(0.2);
+    ctx.lineWidth=0.7;
+    ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke();
+
+    // Mid-point micro particles
+    const mx=(p1.x+p2.x)/2+R(-2,2);
+    const my=(p1.y+p2.y)/2+R(-2,2);
+    ctx.fillStyle=cyan(R(0.06,0.12));
+    ctx.beginPath();ctx.arc(mx,my,R(0.3,0.8),0,Math.PI*2);ctx.fill();
+  }
+
+  // Star nodes — sized by importance
+  for(let i=0;i<pts.length;i++){
+    const p=pts[i];
+    const isBar=i<7;
+    const isCurve=i>=7&&i<18;
+    const isInner=i>=18;
+    const isKey=i===3||i===12; // center of bar, apex of curve
+
+    const size=isKey?5:isInner?R(1.5,2.5):R(2,3.8);
+    const alpha=isKey?0.95:isInner?R(0.25,0.45):R(0.4,0.75);
+
+    drawGlow(ctx,p.x,p.y,size*3.5,alpha*0.25);
+    ctx.fillStyle=cyan(alpha);
+    ctx.beginPath();ctx.arc(p.x,p.y,size,0,Math.PI*2);ctx.fill();
+
+    if(size>2.5){
+      ctx.fillStyle=`rgba(255,255,255,${R(0.15,0.35)})`;
+      ctx.beginPath();ctx.arc(p.x-size*0.2,p.y-size*0.2,size*0.22,0,Math.PI*2);ctx.fill();
+    }
+  }
+
+  // Focal glow on curve apex
+  const focal=pts[12];
+  drawGlow(ctx,focal.x,focal.y,25,0.4);
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER ALL
+// ═══════════════════════════════════════════════════════
+const concepts=[
+  {num:'01',name:'The Vortex',desc:'Five spiral arms of agents swirling into a focal point. A whirlpool of convergence — motion, rhythm, and a glowing core prediction.',draw:drawVortex},
+  {num:'02',name:'The Convergence Burst',desc:'80 lines streaming inward from all directions. Many agents → one prediction. Gradient lines fade toward center, particles mark their origin.',draw:drawBurst},
+  {num:'03',name:'The Network Sphere',desc:'120 points on a fibonacci sphere, projected with perspective. A globe of interconnected agents — depth through size and opacity.',draw:drawSphere},
+  {num:'04',name:'The Mirror Split',desc:'Left half: random noise (raw agents). Right half: structured hexagonal grid (emerged prediction). The center axis is the mirror that transforms chaos into order.',draw:drawMirror},
+  {num:'05',name:'The Deep Ripple',desc:'Concentric ripples radiating from a prediction core. Like a stone dropped in still water — insight spreading outward through the swarm.',draw:drawRipple},
+  {num:'06',name:'The Constellation D',desc:'A "D" monogram formed by constellation stars and lines. Clean, ownable, celestial. The focal star on the curve is the prediction point.',draw:drawConstellationD},
+];
+
+const grid=document.getElementById('grid');
+
+for(const concept of concepts){
+  const card=document.createElement('div');
+  card.className='concept';
+
+  // Header
+  card.innerHTML=`
+    <div class="concept-head">
+      <span class="cnum">${concept.num}</span>
+      <span class="cname">${concept.name}</span>
+    </div>
+    <p class="cdesc">${concept.desc}</p>
+  `;
+
+  // Main canvas
+  const markWrap=document.createElement('div');
+  markWrap.className='mark-wrap';
+  const{c:mainCanvas,ctx:mainCtx,w:mw,h:mh}=createCanvas(220,220);
+  concept.draw(mainCtx,mw,mh);
+  markWrap.appendChild(mainCanvas);
+  card.appendChild(markWrap);
+
+  // Lockup row
+  const lockRow=document.createElement('div');
+  lockRow.className='lock-row';
+
+  // Horizontal lockup
+  const lockup=document.createElement('div');
+  lockup.className='lockup';
+  const{c:lockCanvas,ctx:lockCtx}=createCanvas(40,40);
+  concept.draw(lockCtx,40,40);
+  lockup.appendChild(lockCanvas);
+  const wm=document.createElement('span');
+  wm.className='wm';
+  wm.innerHTML='<span class="d">Deep</span>Miro';
+  lockup.appendChild(wm);
+  lockRow.appendChild(lockup);
+
+  // Sizes
+  const szRow=document.createElement('div');
+  szRow.className='sz-row';
+  for(const sz of[32,16]){
+    const col=document.createElement('div');
+    col.className='sz-col';
+    const lbl=document.createElement('label');
+    lbl.textContent=sz+'px';
+    col.appendChild(lbl);
+    const{c:szCanvas,ctx:szCtx}=createCanvas(sz,sz);
+    concept.draw(szCtx,sz,sz);
+    col.appendChild(szCanvas);
+    szRow.appendChild(col);
+  }
+  lockRow.appendChild(szRow);
+
+  card.appendChild(lockRow);
+  grid.appendChild(card);
+}
+</script>
+</body>
+</html>

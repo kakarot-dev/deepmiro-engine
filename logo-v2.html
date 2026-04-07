@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepMiro Logo — Neural Shoal Refinements</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #07070a;
+    color: #e8e4de;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    min-height: 100vh;
+    padding: 3rem 2rem;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 2.5rem;
+    letter-spacing: -0.03em;
+    text-align: center;
+    margin-bottom: 0.5rem;
+  }
+  h1 span { color: #22d3ee; }
+
+  .subtitle {
+    text-align: center;
+    color: #7a7a8a;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    margin-bottom: 4rem;
+  }
+
+  .concepts { display: flex; flex-direction: column; gap: 5rem; max-width: 1200px; margin: 0 auto; }
+
+  .concept { display: flex; flex-direction: column; gap: 2rem; }
+
+  .concept-header { display: flex; align-items: baseline; gap: 1rem; }
+  .concept-number { font-family: 'JetBrains Mono', monospace; color: #22d3ee; font-size: 0.8rem; opacity: 0.6; }
+  .concept-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.4rem; letter-spacing: -0.02em; }
+  .concept-desc { color: #7a7a8a; font-size: 0.9rem; max-width: 650px; line-height: 1.6; }
+
+  .logo-row { display: flex; align-items: center; gap: 2.5rem; flex-wrap: wrap; }
+
+  .logo-display { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
+  .logo-display label {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.65rem;
+    color: #4a4a58; text-transform: uppercase; letter-spacing: 0.1em;
+  }
+
+  .logo-card {
+    background: #0e0e14; border: 1px solid #1e1e2a; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 2.5rem; transition: border-color 0.3s;
+  }
+  .logo-card:hover { border-color: #22d3ee30; }
+  .logo-card.sm { padding: 1.5rem; border-radius: 12px; }
+  .logo-card.tiny { padding: 0.6rem; border-radius: 8px; background: #111118; }
+  .logo-card.light { background: #f0ede8; border-color: #d4d0c8; }
+  .logo-card.mono { background: #0e0e14; }
+
+  .combo { display: flex; align-items: center; gap: 1rem; }
+  .combo .wm {
+    font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.8rem;
+    letter-spacing: -0.03em; color: #e8e4de;
+  }
+  .combo .wm .d { color: #22d3ee; }
+  .combo.dark-text .wm { color: #111118; }
+  .combo.dark-text .wm .d { color: #0e7490; }
+
+  .divider { border: none; border-top: 1px solid #1e1e2a; margin: 1rem 0; }
+
+  .size-row { display: flex; align-items: end; gap: 1.5rem; flex-wrap: wrap; }
+
+  /* Pulse animation for the eye node */
+  @keyframes pulse {
+    0%, 100% { opacity: 0.9; }
+    50% { opacity: 1; }
+  }
+  @keyframes glow {
+    0%, 100% { filter: drop-shadow(0 0 2px #22d3ee40); }
+    50% { filter: drop-shadow(0 0 6px #22d3ee80); }
+  }
+  .eye-pulse { animation: pulse 3s ease-in-out infinite; }
+  .mark-glow:hover { animation: glow 2s ease-in-out infinite; }
+
+  /* Stacked logo */
+  .stacked { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; }
+  .stacked .wm {
+    font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.4rem;
+    letter-spacing: 0.15em; color: #e8e4de; text-transform: uppercase;
+  }
+  .stacked .wm .d { color: #22d3ee; }
+  .stacked .tag {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.55rem;
+    color: #7a7a8a; letter-spacing: 0.2em; text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<h1>Neural Shoal — <span>Deep Refinements</span></h1>
+<p class="subtitle">// concept 05 expanded: the fish that emerges from the swarm</p>
+
+<div class="concepts">
+
+<!-- ═══════════════════════════════════════════════════════════════
+     VARIATION A: FULL BETTA
+     Rich, detailed betta fish with flowing dorsal & caudal fins,
+     dense network topology. Maximum detail for hero/print use.
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="concept">
+  <div>
+    <div class="concept-header">
+      <span class="concept-number">A</span>
+      <span class="concept-title">Full Betta</span>
+    </div>
+    <p class="concept-desc">
+      Rich, anatomically-informed betta fish with flowing dorsal and caudal fins.
+      Dense network topology. Maximum detail — for hero sections, print, merchandise.
+      The fish is never drawn — it emerges entirely from node density and connections.
+    </p>
+  </div>
+
+  <div class="logo-row">
+    <div class="logo-display">
+      <label>Full mark</label>
+      <div class="logo-card mark-glow">
+        <svg width="280" height="180" viewBox="0 0 340 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="a-title">
+          <title id="a-title">DeepMiro Neural Shoal Logo</title>
+          <defs>
+            <radialGradient id="eye-glow-a" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+
+          <!-- ====== CAUDAL FIN (TAIL) — sparse, scattered, ghostly ====== -->
+          <g id="tail" opacity="0.85">
+            <!-- Upper fork -->
+            <line x1="52" y1="52" x2="38" y2="38" stroke="#22d3ee" stroke-width="0.6" opacity="0.12"/>
+            <line x1="38" y1="38" x2="22" y2="22" stroke="#22d3ee" stroke-width="0.5" opacity="0.08"/>
+            <line x1="52" y1="52" x2="42" y2="28" stroke="#22d3ee" stroke-width="0.6" opacity="0.1"/>
+            <line x1="42" y1="28" x2="30" y2="12" stroke="#22d3ee" stroke-width="0.5" opacity="0.07"/>
+            <line x1="38" y1="38" x2="42" y2="28" stroke="#22d3ee" stroke-width="0.5" opacity="0.09"/>
+            <line x1="52" y1="52" x2="48" y2="44" stroke="#22d3ee" stroke-width="0.6" opacity="0.12"/>
+            <line x1="48" y1="44" x2="35" y2="32" stroke="#22d3ee" stroke-width="0.5" opacity="0.1"/>
+            <!-- Lower fork -->
+            <line x1="52" y1="52" x2="38" y2="66" stroke="#22d3ee" stroke-width="0.6" opacity="0.12"/>
+            <line x1="38" y1="66" x2="22" y2="82" stroke="#22d3ee" stroke-width="0.5" opacity="0.08"/>
+            <line x1="52" y1="52" x2="42" y2="76" stroke="#22d3ee" stroke-width="0.6" opacity="0.1"/>
+            <line x1="42" y1="76" x2="30" y2="92" stroke="#22d3ee" stroke-width="0.5" opacity="0.07"/>
+            <line x1="38" y1="66" x2="42" y2="76" stroke="#22d3ee" stroke-width="0.5" opacity="0.09"/>
+            <!-- Tail nodes -->
+            <circle cx="22" cy="22" r="1.5" fill="#22d3ee" opacity="0.12"/>
+            <circle cx="30" cy="12" r="1.2" fill="#22d3ee" opacity="0.1"/>
+            <circle cx="35" cy="32" r="1.3" fill="#22d3ee" opacity="0.12"/>
+            <circle cx="38" cy="38" r="1.8" fill="#22d3ee" opacity="0.15"/>
+            <circle cx="42" cy="28" r="1.5" fill="#22d3ee" opacity="0.13"/>
+            <circle cx="48" cy="44" r="1.6" fill="#22d3ee" opacity="0.15"/>
+            <circle cx="22" cy="82" r="1.5" fill="#22d3ee" opacity="0.12"/>
+            <circle cx="30" cy="92" r="1.2" fill="#22d3ee" opacity="0.1"/>
+            <circle cx="38" cy="66" r="1.8" fill="#22d3ee" opacity="0.15"/>
+            <circle cx="42" cy="76" r="1.5" fill="#22d3ee" opacity="0.13"/>
+          </g>
+
+          <!-- ====== CAUDAL PEDUNCLE (tail base) ====== -->
+          <g id="peduncle">
+            <line x1="52" y1="52" x2="68" y2="56" stroke="#22d3ee" stroke-width="0.8" opacity="0.18"/>
+            <line x1="52" y1="52" x2="65" y2="48" stroke="#22d3ee" stroke-width="0.8" opacity="0.18"/>
+            <line x1="65" y1="48" x2="68" y2="56" stroke="#22d3ee" stroke-width="0.7" opacity="0.16"/>
+            <circle cx="52" cy="52" r="2.2" fill="#22d3ee" opacity="0.2"/>
+            <circle cx="65" cy="48" r="1.8" fill="#22d3ee" opacity="0.2"/>
+            <circle cx="68" cy="56" r="1.8" fill="#22d3ee" opacity="0.2"/>
+          </g>
+
+          <!-- ====== BODY — mid density, spine + belly + dorsal ====== -->
+          <g id="body">
+            <!-- Spine (center line) -->
+            <line x1="68" y1="56" x2="88" y2="62" stroke="#22d3ee" stroke-width="1" opacity="0.22"/>
+            <line x1="88" y1="62" x2="110" y2="68" stroke="#22d3ee" stroke-width="1" opacity="0.25"/>
+            <line x1="110" y1="68" x2="135" y2="72" stroke="#22d3ee" stroke-width="1.1" opacity="0.28"/>
+            <line x1="135" y1="72" x2="158" y2="74" stroke="#22d3ee" stroke-width="1.2" opacity="0.32"/>
+            <line x1="158" y1="74" x2="182" y2="74" stroke="#22d3ee" stroke-width="1.3" opacity="0.36"/>
+            <line x1="182" y1="74" x2="205" y2="72" stroke="#22d3ee" stroke-width="1.4" opacity="0.4"/>
+
+            <!-- Dorsal edge -->
+            <line x1="88" y1="62" x2="95" y2="52" stroke="#22d3ee" stroke-width="0.8" opacity="0.2"/>
+            <line x1="110" y1="68" x2="115" y2="55" stroke="#22d3ee" stroke-width="0.9" opacity="0.22"/>
+            <line x1="135" y1="72" x2="138" y2="58" stroke="#22d3ee" stroke-width="1" opacity="0.25"/>
+            <line x1="158" y1="74" x2="160" y2="60" stroke="#22d3ee" stroke-width="1" opacity="0.28"/>
+            <line x1="182" y1="74" x2="182" y2="62" stroke="#22d3ee" stroke-width="1.1" opacity="0.3"/>
+
+            <!-- Belly edge -->
+            <line x1="88" y1="62" x2="92" y2="75" stroke="#22d3ee" stroke-width="0.8" opacity="0.2"/>
+            <line x1="110" y1="68" x2="112" y2="82" stroke="#22d3ee" stroke-width="0.9" opacity="0.22"/>
+            <line x1="135" y1="72" x2="136" y2="88" stroke="#22d3ee" stroke-width="1" opacity="0.25"/>
+            <line x1="158" y1="74" x2="158" y2="90" stroke="#22d3ee" stroke-width="1" opacity="0.28"/>
+            <line x1="182" y1="74" x2="180" y2="88" stroke="#22d3ee" stroke-width="1.1" opacity="0.3"/>
+
+            <!-- Cross connections (body mesh) -->
+            <line x1="95" y1="52" x2="115" y2="55" stroke="#22d3ee" stroke-width="0.7" opacity="0.18"/>
+            <line x1="115" y1="55" x2="138" y2="58" stroke="#22d3ee" stroke-width="0.8" opacity="0.22"/>
+            <line x1="138" y1="58" x2="160" y2="60" stroke="#22d3ee" stroke-width="0.9" opacity="0.25"/>
+            <line x1="160" y1="60" x2="182" y2="62" stroke="#22d3ee" stroke-width="1" opacity="0.28"/>
+            <line x1="92" y1="75" x2="112" y2="82" stroke="#22d3ee" stroke-width="0.7" opacity="0.18"/>
+            <line x1="112" y1="82" x2="136" y2="88" stroke="#22d3ee" stroke-width="0.8" opacity="0.22"/>
+            <line x1="136" y1="88" x2="158" y2="90" stroke="#22d3ee" stroke-width="0.9" opacity="0.25"/>
+            <line x1="158" y1="90" x2="180" y2="88" stroke="#22d3ee" stroke-width="1" opacity="0.28"/>
+            <!-- Diagonal mesh -->
+            <line x1="95" y1="52" x2="110" y2="68" stroke="#22d3ee" stroke-width="0.6" opacity="0.15"/>
+            <line x1="115" y1="55" x2="135" y2="72" stroke="#22d3ee" stroke-width="0.7" opacity="0.18"/>
+            <line x1="138" y1="58" x2="158" y2="74" stroke="#22d3ee" stroke-width="0.8" opacity="0.22"/>
+            <line x1="92" y1="75" x2="110" y2="68" stroke="#22d3ee" stroke-width="0.6" opacity="0.15"/>
+            <line x1="112" y1="82" x2="135" y2="72" stroke="#22d3ee" stroke-width="0.7" opacity="0.18"/>
+            <line x1="136" y1="88" x2="158" y2="74" stroke="#22d3ee" stroke-width="0.8" opacity="0.22"/>
+
+            <!-- Body nodes -->
+            <circle cx="88" cy="62" r="2.2" fill="#22d3ee" opacity="0.25"/>
+            <circle cx="95" cy="52" r="2" fill="#22d3ee" opacity="0.22"/>
+            <circle cx="92" cy="75" r="2" fill="#22d3ee" opacity="0.22"/>
+            <circle cx="110" cy="68" r="2.5" fill="#22d3ee" opacity="0.3"/>
+            <circle cx="115" cy="55" r="2.2" fill="#22d3ee" opacity="0.25"/>
+            <circle cx="112" cy="82" r="2.2" fill="#22d3ee" opacity="0.25"/>
+            <circle cx="135" cy="72" r="2.8" fill="#22d3ee" opacity="0.35"/>
+            <circle cx="138" cy="58" r="2.5" fill="#22d3ee" opacity="0.3"/>
+            <circle cx="136" cy="88" r="2.5" fill="#22d3ee" opacity="0.3"/>
+            <circle cx="158" cy="74" r="3" fill="#22d3ee" opacity="0.38"/>
+            <circle cx="160" cy="60" r="2.8" fill="#22d3ee" opacity="0.32"/>
+            <circle cx="158" cy="90" r="2.8" fill="#22d3ee" opacity="0.32"/>
+            <circle cx="182" cy="74" r="3.2" fill="#22d3ee" opacity="0.42"/>
+            <circle cx="182" cy="62" r="3" fill="#22d3ee" opacity="0.38"/>
+            <circle cx="180" cy="88" r="3" fill="#22d3ee" opacity="0.38"/>
+          </g>
+
+          <!-- ====== DORSAL FIN — flowing upward cascade ====== -->
+          <g id="dorsal-fin">
+            <line x1="115" y1="55" x2="120" y2="40" stroke="#22d3ee" stroke-width="0.7" opacity="0.18"/>
+            <line x1="138" y1="58" x2="140" y2="38" stroke="#22d3ee" stroke-width="0.8" opacity="0.2"/>
+            <line x1="160" y1="60" x2="158" y2="36" stroke="#22d3ee" stroke-width="0.9" opacity="0.22"/>
+            <line x1="182" y1="62" x2="178" y2="40" stroke="#22d3ee" stroke-width="0.9" opacity="0.25"/>
+            <line x1="120" y1="40" x2="140" y2="38" stroke="#22d3ee" stroke-width="0.6" opacity="0.15"/>
+            <line x1="140" y1="38" x2="158" y2="36" stroke="#22d3ee" stroke-width="0.7" opacity="0.18"/>
+            <line x1="158" y1="36" x2="178" y2="40" stroke="#22d3ee" stroke-width="0.7" opacity="0.2"/>
+            <!-- Upper fin tips -->
+            <line x1="120" y1="40" x2="125" y2="28" stroke="#22d3ee" stroke-width="0.5" opacity="0.1"/>
+            <line x1="140" y1="38" x2="142" y2="24" stroke="#22d3ee" stroke-width="0.5" opacity="0.12"/>
+            <line x1="158" y1="36" x2="156" y2="22" stroke="#22d3ee" stroke-width="0.6" opacity="0.14"/>
+            <line x1="178" y1="40" x2="174" y2="30" stroke="#22d3ee" stroke-width="0.5" opacity="0.12"/>
+            <line x1="125" y1="28" x2="142" y2="24" stroke="#22d3ee" stroke-width="0.4" opacity="0.08"/>
+            <line x1="142" y1="24" x2="156" y2="22" stroke="#22d3ee" stroke-width="0.4" opacity="0.1"/>
+            <line x1="156" y1="22" x2="174" y2="30" stroke="#22d3ee" stroke-width="0.4" opacity="0.1"/>
+            <!-- Dorsal fin nodes -->
+            <circle cx="120" cy="40" r="1.8" fill="#22d3ee" opacity="0.2"/>
+            <circle cx="140" cy="38" r="2" fill="#22d3ee" opacity="0.22"/>
+            <circle cx="158" cy="36" r="2" fill="#22d3ee" opacity="0.24"/>
+            <circle cx="178" cy="40" r="1.8" fill="#22d3ee" opacity="0.22"/>
+            <circle cx="125" cy="28" r="1.3" fill="#22d3ee" opacity="0.12"/>
+            <circle cx="142" cy="24" r="1.4" fill="#22d3ee" opacity="0.14"/>
+            <circle cx="156" cy="22" r="1.5" fill="#22d3ee" opacity="0.16"/>
+            <circle cx="174" cy="30" r="1.3" fill="#22d3ee" opacity="0.14"/>
+          </g>
+
+          <!-- ====== VENTRAL/ANAL FIN — flowing downward ====== -->
+          <g id="ventral-fin">
+            <line x1="136" y1="88" x2="138" y2="102" stroke="#22d3ee" stroke-width="0.7" opacity="0.18"/>
+            <line x1="158" y1="90" x2="158" y2="106" stroke="#22d3ee" stroke-width="0.8" opacity="0.2"/>
+            <line x1="180" y1="88" x2="178" y2="100" stroke="#22d3ee" stroke-width="0.8" opacity="0.22"/>
+            <line x1="138" y1="102" x2="158" y2="106" stroke="#22d3ee" stroke-width="0.6" opacity="0.15"/>
+            <line x1="158" y1="106" x2="178" y2="100" stroke="#22d3ee" stroke-width="0.6" opacity="0.18"/>
+            <!-- Lower tips -->
+            <line x1="138" y1="102" x2="140" y2="115" stroke="#22d3ee" stroke-width="0.5" opacity="0.1"/>
+            <line x1="158" y1="106" x2="156" y2="120" stroke="#22d3ee" stroke-width="0.5" opacity="0.12"/>
+            <line x1="178" y1="100" x2="175" y2="112" stroke="#22d3ee" stroke-width="0.5" opacity="0.1"/>
+            <line x1="140" y1="115" x2="156" y2="120" stroke="#22d3ee" stroke-width="0.4" opacity="0.08"/>
+            <line x1="156" y1="120" x2="175" y2="112" stroke="#22d3ee" stroke-width="0.4" opacity="0.09"/>
+            <!-- Ventral nodes -->
+            <circle cx="138" cy="102" r="1.8" fill="#22d3ee" opacity="0.2"/>
+            <circle cx="158" cy="106" r="2" fill="#22d3ee" opacity="0.22"/>
+            <circle cx="178" cy="100" r="1.8" fill="#22d3ee" opacity="0.22"/>
+            <circle cx="140" cy="115" r="1.3" fill="#22d3ee" opacity="0.12"/>
+            <circle cx="156" cy="120" r="1.4" fill="#22d3ee" opacity="0.14"/>
+            <circle cx="175" cy="112" r="1.3" fill="#22d3ee" opacity="0.12"/>
+          </g>
+
+          <!-- ====== PECTORAL FIN — small cluster mid-body ====== -->
+          <g id="pectoral-fin">
+            <line x1="182" y1="74" x2="190" y2="85" stroke="#22d3ee" stroke-width="0.8" opacity="0.25"/>
+            <line x1="180" y1="88" x2="190" y2="85" stroke="#22d3ee" stroke-width="0.7" opacity="0.22"/>
+            <line x1="190" y1="85" x2="195" y2="95" stroke="#22d3ee" stroke-width="0.6" opacity="0.18"/>
+            <line x1="190" y1="85" x2="198" y2="82" stroke="#22d3ee" stroke-width="0.5" opacity="0.15"/>
+            <circle cx="190" cy="85" r="1.8" fill="#22d3ee" opacity="0.25"/>
+            <circle cx="195" cy="95" r="1.3" fill="#22d3ee" opacity="0.15"/>
+            <circle cx="198" cy="82" r="1.2" fill="#22d3ee" opacity="0.13"/>
+          </g>
+
+          <!-- ====== HEAD — dense, bright, tight mesh ====== -->
+          <g id="head">
+            <!-- Head structure connections -->
+            <line x1="205" y1="72" x2="218" y2="66" stroke="#22d3ee" stroke-width="1.5" opacity="0.42"/>
+            <line x1="205" y1="72" x2="218" y2="72" stroke="#22d3ee" stroke-width="1.5" opacity="0.45"/>
+            <line x1="205" y1="72" x2="218" y2="78" stroke="#22d3ee" stroke-width="1.5" opacity="0.42"/>
+            <line x1="182" y1="62" x2="205" y2="72" stroke="#22d3ee" stroke-width="1.3" opacity="0.38"/>
+            <line x1="180" y1="88" x2="205" y2="72" stroke="#22d3ee" stroke-width="1.3" opacity="0.38"/>
+            <line x1="182" y1="62" x2="218" y2="66" stroke="#22d3ee" stroke-width="1.2" opacity="0.35"/>
+            <line x1="180" y1="88" x2="218" y2="78" stroke="#22d3ee" stroke-width="1.2" opacity="0.35"/>
+
+            <!-- Forward head -->
+            <line x1="218" y1="66" x2="232" y2="64" stroke="#22d3ee" stroke-width="1.5" opacity="0.48"/>
+            <line x1="218" y1="72" x2="232" y2="70" stroke="#22d3ee" stroke-width="1.6" opacity="0.52"/>
+            <line x1="218" y1="78" x2="232" y2="76" stroke="#22d3ee" stroke-width="1.5" opacity="0.48"/>
+            <line x1="218" y1="66" x2="218" y2="72" stroke="#22d3ee" stroke-width="1.2" opacity="0.38"/>
+            <line x1="218" y1="72" x2="218" y2="78" stroke="#22d3ee" stroke-width="1.2" opacity="0.38"/>
+            <line x1="232" y1="64" x2="232" y2="70" stroke="#22d3ee" stroke-width="1.3" opacity="0.42"/>
+            <line x1="232" y1="70" x2="232" y2="76" stroke="#22d3ee" stroke-width="1.3" opacity="0.42"/>
+
+            <!-- Snout -->
+            <line x1="232" y1="64" x2="245" y2="66" stroke="#22d3ee" stroke-width="1.5" opacity="0.52"/>
+            <line x1="232" y1="70" x2="245" y2="69" stroke="#22d3ee" stroke-width="1.6" opacity="0.55"/>
+            <line x1="232" y1="76" x2="245" y2="73" stroke="#22d3ee" stroke-width="1.5" opacity="0.52"/>
+            <line x1="245" y1="66" x2="256" y2="68" stroke="#22d3ee" stroke-width="1.4" opacity="0.5"/>
+            <line x1="245" y1="69" x2="256" y2="70" stroke="#22d3ee" stroke-width="1.5" opacity="0.55"/>
+            <line x1="245" y1="73" x2="256" y2="72" stroke="#22d3ee" stroke-width="1.4" opacity="0.5"/>
+            <line x1="245" y1="66" x2="245" y2="73" stroke="#22d3ee" stroke-width="1.2" opacity="0.45"/>
+            <line x1="256" y1="68" x2="265" y2="70" stroke="#22d3ee" stroke-width="1.2" opacity="0.45"/>
+            <line x1="256" y1="72" x2="265" y2="70" stroke="#22d3ee" stroke-width="1.2" opacity="0.45"/>
+
+            <!-- Head nodes -->
+            <circle cx="205" cy="72" r="3.5" fill="#22d3ee" opacity="0.45"/>
+            <circle cx="218" cy="66" r="3.2" fill="#22d3ee" opacity="0.5"/>
+            <circle cx="218" cy="72" r="3.5" fill="#22d3ee" opacity="0.52"/>
+            <circle cx="218" cy="78" r="3.2" fill="#22d3ee" opacity="0.5"/>
+            <circle cx="232" cy="64" r="3.5" fill="#22d3ee" opacity="0.58"/>
+            <circle cx="232" cy="70" r="3.8" fill="#22d3ee" opacity="0.6"/>
+            <circle cx="232" cy="76" r="3.5" fill="#22d3ee" opacity="0.58"/>
+            <circle cx="245" cy="66" r="3.2" fill="#22d3ee" opacity="0.62"/>
+            <circle cx="245" cy="69" r="3.5" fill="#22d3ee" opacity="0.65"/>
+            <circle cx="245" cy="73" r="3.2" fill="#22d3ee" opacity="0.62"/>
+            <circle cx="256" cy="68" r="3" fill="#22d3ee" opacity="0.6"/>
+            <circle cx="256" cy="72" r="3" fill="#22d3ee" opacity="0.6"/>
+            <circle cx="265" cy="70" r="2.5" fill="#22d3ee" opacity="0.55"/>
+          </g>
+
+          <!-- ====== EYE — the prediction focal point ====== -->
+          <g id="eye" class="eye-pulse">
+            <circle cx="238" cy="68" r="12" fill="url(#eye-glow-a)"/>
+            <circle cx="238" cy="68" r="6" fill="#22d3ee" opacity="0.95"/>
+            <circle cx="238" cy="68" r="9" fill="none" stroke="#22d3ee" stroke-width="1" opacity="0.2"/>
+          </g>
+
+          <!-- ====== STRAY AGENTS — particles outside the fish ====== -->
+          <g id="stray-agents">
+            <circle cx="15" cy="45" r="1" fill="#22d3ee" opacity="0.06"/>
+            <circle cx="28" cy="105" r="1.2" fill="#22d3ee" opacity="0.07"/>
+            <circle cx="75" cy="20" r="1" fill="#22d3ee" opacity="0.06"/>
+            <circle cx="100" cy="105" r="1.1" fill="#22d3ee" opacity="0.07"/>
+            <circle cx="200" cy="18" r="1" fill="#22d3ee" opacity="0.06"/>
+            <circle cx="270" cy="45" r="1.2" fill="#22d3ee" opacity="0.06"/>
+            <circle cx="280" cy="95" r="1" fill="#22d3ee" opacity="0.05"/>
+            <circle cx="60" cy="110" r="0.8" fill="#22d3ee" opacity="0.05"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Combination marks -->
+  <div class="logo-row">
+    <div class="logo-display">
+      <label>Horizontal lockup</label>
+      <div class="logo-card sm">
+        <div class="combo">
+          <svg width="120" height="75" viewBox="0 0 340 220" xmlns="http://www.w3.org/2000/svg">
+            <defs><radialGradient id="eg2" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#22d3ee" stop-opacity="0.3"/><stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/></radialGradient></defs>
+            <g id="tail-s"><line x1="52" y1="52" x2="38" y2="38" stroke="#22d3ee" stroke-width="0.8" opacity="0.12"/><line x1="52" y1="52" x2="38" y2="66" stroke="#22d3ee" stroke-width="0.8" opacity="0.12"/><line x1="38" y1="38" x2="25" y2="25" stroke="#22d3ee" stroke-width="0.6" opacity="0.08"/><line x1="38" y1="66" x2="25" y2="80" stroke="#22d3ee" stroke-width="0.6" opacity="0.08"/><circle cx="25" cy="25" r="1.5" fill="#22d3ee" opacity="0.12"/><circle cx="38" cy="38" r="1.8" fill="#22d3ee" opacity="0.15"/><circle cx="52" cy="52" r="2" fill="#22d3ee" opacity="0.2"/><circle cx="25" cy="80" r="1.5" fill="#22d3ee" opacity="0.12"/><circle cx="38" cy="66" r="1.8" fill="#22d3ee" opacity="0.15"/></g>
+            <g id="body-s"><line x1="52" y1="52" x2="88" y2="62" stroke="#22d3ee" stroke-width="1" opacity="0.2"/><line x1="88" y1="62" x2="135" y2="72" stroke="#22d3ee" stroke-width="1" opacity="0.25"/><line x1="135" y1="72" x2="182" y2="74" stroke="#22d3ee" stroke-width="1.2" opacity="0.32"/><line x1="182" y1="74" x2="205" y2="72" stroke="#22d3ee" stroke-width="1.3" opacity="0.38"/><circle cx="88" cy="62" r="2.2" fill="#22d3ee" opacity="0.25"/><circle cx="135" cy="72" r="2.8" fill="#22d3ee" opacity="0.32"/><circle cx="182" cy="74" r="3" fill="#22d3ee" opacity="0.4"/><circle cx="205" cy="72" r="3.2" fill="#22d3ee" opacity="0.45"/></g>
+            <g id="head-s"><line x1="205" y1="72" x2="232" y2="70" stroke="#22d3ee" stroke-width="1.5" opacity="0.5"/><line x1="232" y1="70" x2="250" y2="70" stroke="#22d3ee" stroke-width="1.5" opacity="0.55"/><circle cx="218" cy="66" r="3" fill="#22d3ee" opacity="0.48"/><circle cx="218" cy="78" r="3" fill="#22d3ee" opacity="0.48"/><circle cx="232" cy="70" r="3.5" fill="#22d3ee" opacity="0.58"/><circle cx="245" cy="69" r="3.2" fill="#22d3ee" opacity="0.6"/><circle cx="250" cy="70" r="2.5" fill="#22d3ee" opacity="0.5"/></g>
+            <g id="eye-s"><circle cx="238" cy="68" r="10" fill="url(#eg2)"/><circle cx="238" cy="68" r="5" fill="#22d3ee" opacity="0.95"/></g>
+          </svg>
+          <span class="wm"><span class="d">Deep</span>Miro</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="logo-display">
+      <label>Stacked</label>
+      <div class="logo-card sm">
+        <div class="stacked">
+          <svg width="100" height="65" viewBox="0 0 340 220" xmlns="http://www.w3.org/2000/svg">
+            <defs><radialGradient id="eg3" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#22d3ee" stop-opacity="0.3"/><stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/></radialGradient></defs>
+            <g id="tail-st"><line x1="52" y1="52" x2="38" y2="38" stroke="#22d3ee" stroke-width="0.8" opacity="0.12"/><line x1="52" y1="52" x2="38" y2="66" stroke="#22d3ee" stroke-width="0.8" opacity="0.12"/><circle cx="38" cy="38" r="1.8" fill="#22d3ee" opacity="0.15"/><circle cx="52" cy="52" r="2" fill="#22d3ee" opacity="0.2"/><circle cx="38" cy="66" r="1.8" fill="#22d3ee" opacity="0.15"/></g>
+            <g><line x1="52" y1="52" x2="88" y2="62" stroke="#22d3ee" stroke-width="1" opacity="0.2"/><line x1="88" y1="62" x2="135" y2="72" stroke="#22d3ee" stroke-width="1" opacity="0.25"/><line x1="135" y1="72" x2="182" y2="74" stroke="#22d3ee" stroke-width="1.2" opacity="0.32"/><line x1="182" y1="74" x2="205" y2="72" stroke="#22d3ee" stroke-width="1.3" opacity="0.38"/><circle cx="88" cy="62" r="2.2" fill="#22d3ee" opacity="0.25"/><circle cx="135" cy="72" r="2.8" fill="#22d3ee" opacity="0.32"/><circle cx="182" cy="74" r="3" fill="#22d3ee" opacity="0.4"/><circle cx="205" cy="72" r="3.2" fill="#22d3ee" opacity="0.45"/></g>
+            <g><line x1="205" y1="72" x2="232" y2="70" stroke="#22d3ee" stroke-width="1.5" opacity="0.5"/><line x1="232" y1="70" x2="250" y2="70" stroke="#22d3ee" stroke-width="1.5" opacity="0.55"/><circle cx="218" cy="66" r="3" fill="#22d3ee" opacity="0.48"/><circle cx="218" cy="78" r="3" fill="#22d3ee" opacity="0.48"/><circle cx="232" cy="70" r="3.5" fill="#22d3ee" opacity="0.58"/><circle cx="245" cy="69" r="3.2" fill="#22d3ee" opacity="0.6"/></g>
+            <g><circle cx="238" cy="68" r="10" fill="url(#eg3)"/><circle cx="238" cy="68" r="5" fill="#22d3ee" opacity="0.95"/></g>
+          </svg>
+          <span class="wm"><span class="d">DEEP</span>MIRO</span>
+          <span class="tag">swarm intelligence engine</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Size tests -->
+  <div class="size-row">
+    <div class="logo-display">
+      <label>64px</label>
+      <div class="logo-card tiny">
+        <svg width="64" height="40" viewBox="0 0 340 220" xmlns="http://www.w3.org/2000/svg">
+          <line x1="40" y1="50" x2="52" y2="52" stroke="#22d3ee" stroke-width="2" opacity="0.12"/>
+          <line x1="40" y1="55" x2="52" y2="52" stroke="#22d3ee" stroke-width="2" opacity="0.12"/>
+          <line x1="52" y1="52" x2="110" y2="68" stroke="#22d3ee" stroke-width="2" opacity="0.2"/>
+          <line x1="110" y1="68" x2="182" y2="74" stroke="#22d3ee" stroke-width="2.5" opacity="0.3"/>
+          <line x1="182" y1="74" x2="232" y2="70" stroke="#22d3ee" stroke-width="3" opacity="0.45"/>
+          <circle cx="52" cy="52" r="3" fill="#22d3ee" opacity="0.2"/>
+          <circle cx="110" cy="68" r="4" fill="#22d3ee" opacity="0.3"/>
+          <circle cx="158" cy="74" r="4.5" fill="#22d3ee" opacity="0.38"/>
+          <circle cx="182" cy="74" r="5" fill="#22d3ee" opacity="0.45"/>
+          <circle cx="218" cy="70" r="5.5" fill="#22d3ee" opacity="0.55"/>
+          <circle cx="238" cy="68" r="7" fill="#22d3ee" opacity="0.9"/>
+        </svg>
+      </div>
+    </div>
+    <div class="logo-display">
+      <label>32px</label>
+      <div class="logo-card tiny">
+        <svg width="32" height="20" viewBox="0 0 340 220" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="52" cy="55" r="5" fill="#22d3ee" opacity="0.15"/>
+          <circle cx="120" cy="68" r="6" fill="#22d3ee" opacity="0.25"/>
+          <circle cx="182" cy="74" r="7" fill="#22d3ee" opacity="0.4"/>
+          <circle cx="238" cy="68" r="10" fill="#22d3ee" opacity="0.9"/>
+        </svg>
+      </div>
+    </div>
+    <div class="logo-display">
+      <label>16px</label>
+      <div class="logo-card tiny">
+        <svg width="16" height="10" viewBox="0 0 340 220" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="100" cy="68" r="12" fill="#22d3ee" opacity="0.2"/>
+          <circle cx="190" cy="72" r="14" fill="#22d3ee" opacity="0.4"/>
+          <circle cx="240" cy="68" r="16" fill="#22d3ee" opacity="0.9"/>
+        </svg>
+      </div>
+    </div>
+    <div class="logo-display">
+      <label>Mono</label>
+      <div class="logo-card tiny mono">
+        <svg width="64" height="40" viewBox="0 0 340 220" xmlns="http://www.w3.org/2000/svg">
+          <line x1="40" y1="50" x2="52" y2="52" stroke="#e8e4de" stroke-width="2" opacity="0.12"/>
+          <line x1="40" y1="55" x2="52" y2="52" stroke="#e8e4de" stroke-width="2" opacity="0.12"/>
+          <line x1="52" y1="52" x2="110" y2="68" stroke="#e8e4de" stroke-width="2" opacity="0.2"/>
+          <line x1="110" y1="68" x2="182" y2="74" stroke="#e8e4de" stroke-width="2.5" opacity="0.3"/>
+          <line x1="182" y1="74" x2="232" y2="70" stroke="#e8e4de" stroke-width="3" opacity="0.45"/>
+          <circle cx="52" cy="52" r="3" fill="#e8e4de" opacity="0.2"/>
+          <circle cx="110" cy="68" r="4" fill="#e8e4de" opacity="0.3"/>
+          <circle cx="158" cy="74" r="4.5" fill="#e8e4de" opacity="0.38"/>
+          <circle cx="182" cy="74" r="5" fill="#e8e4de" opacity="0.45"/>
+          <circle cx="218" cy="70" r="5.5" fill="#e8e4de" opacity="0.55"/>
+          <circle cx="238" cy="68" r="7" fill="#e8e4de" opacity="0.9"/>
+        </svg>
+      </div>
+    </div>
+    <div class="logo-display">
+      <label>Light bg</label>
+      <div class="logo-card tiny light">
+        <svg width="64" height="40" viewBox="0 0 340 220" xmlns="http://www.w3.org/2000/svg">
+          <line x1="40" y1="50" x2="52" y2="52" stroke="#0e7490" stroke-width="2" opacity="0.15"/>
+          <line x1="40" y1="55" x2="52" y2="52" stroke="#0e7490" stroke-width="2" opacity="0.15"/>
+          <line x1="52" y1="52" x2="110" y2="68" stroke="#0e7490" stroke-width="2" opacity="0.25"/>
+          <line x1="110" y1="68" x2="182" y2="74" stroke="#0e7490" stroke-width="2.5" opacity="0.35"/>
+          <line x1="182" y1="74" x2="232" y2="70" stroke="#0e7490" stroke-width="3" opacity="0.5"/>
+          <circle cx="52" cy="52" r="3" fill="#0e7490" opacity="0.25"/>
+          <circle cx="110" cy="68" r="4" fill="#0e7490" opacity="0.35"/>
+          <circle cx="158" cy="74" r="4.5" fill="#0e7490" opacity="0.42"/>
+          <circle cx="182" cy="74" r="5" fill="#0e7490" opacity="0.5"/>
+          <circle cx="218" cy="70" r="5.5" fill="#0e7490" opacity="0.6"/>
+          <circle cx="238" cy="68" r="7" fill="#0e7490" opacity="0.9"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════════════
+     VARIATION B: EMERGENCE
+     Left side = chaos (scattered dots), progressively organizes
+     into the fish shape on the right. The fish literally emerges
+     from data noise.
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="concept">
+  <div>
+    <div class="concept-header">
+      <span class="concept-number">B</span>
+      <span class="concept-title">Emergence</span>
+    </div>
+    <p class="concept-desc">
+      The left side is pure chaos — scattered, unconnected particles (raw agents).
+      Moving rightward, they self-organize into a recognizable fish form.
+      The logo IS the product: order emerging from collective interaction.
+    </p>
+  </div>
+
+  <div class="logo-row">
+    <div class="logo-display">
+      <label>Full mark</label>
+      <div class="logo-card mark-glow">
+        <svg width="300" height="160" viewBox="0 0 380 200" xmlns="http://www.w3.org/2000/svg">
+          <!-- CHAOS ZONE (left) — random scattered dots, no connections -->
+          <g id="chaos">
+            <circle cx="12" cy="85" r="1.5" fill="#22d3ee" opacity="0.06"/>
+            <circle cx="25" cy="42" r="1.2" fill="#22d3ee" opacity="0.05"/>
+            <circle cx="18" cy="130" r="1" fill="#22d3ee" opacity="0.05"/>
+            <circle cx="35" cy="65" r="1.8" fill="#22d3ee" opacity="0.07"/>
+            <circle cx="30" cy="155" r="1.3" fill="#22d3ee" opacity="0.06"/>
+            <circle cx="42" cy="100" r="1.5" fill="#22d3ee" opacity="0.07"/>
+            <circle cx="38" cy="28" r="1" fill="#22d3ee" opacity="0.05"/>
+            <circle cx="48" cy="142" r="1.2" fill="#22d3ee" opacity="0.06"/>
+            <circle cx="50" cy="55" r="1.6" fill="#22d3ee" opacity="0.08"/>
+            <circle cx="55" cy="115" r="1.4" fill="#22d3ee" opacity="0.07"/>
+            <circle cx="45" cy="80" r="1.3" fill="#22d3ee" opacity="0.07"/>
+            <circle cx="58" cy="38" r="1.1" fill="#22d3ee" opacity="0.06"/>
+            <circle cx="52" cy="165" r="1" fill="#22d3ee" opacity="0.05"/>
+            <circle cx="22" cy="68" r="1" fill="#22d3ee" opacity="0.05"/>
+            <circle cx="40" cy="180" r="0.8" fill="#22d3ee" opacity="0.04"/>
+            <circle cx="15" cy="20" r="0.9" fill="#22d3ee" opacity="0.04"/>
+          </g>
+
+          <!-- TRANSITION ZONE — some connections starting to form -->
+          <g id="transition">
+            <line x1="65" y1="72" x2="78" y2="78" stroke="#22d3ee" stroke-width="0.5" opacity="0.08"/>
+            <line x1="70" y1="105" x2="82" y2="95" stroke="#22d3ee" stroke-width="0.5" opacity="0.08"/>
+            <line x1="68" y1="50" x2="80" y2="58" stroke="#22d3ee" stroke-width="0.5" opacity="0.07"/>
+            <line x1="72" y1="130" x2="85" y2="118" stroke="#22d3ee" stroke-width="0.5" opacity="0.07"/>
+            <circle cx="65" cy="72" r="1.8" fill="#22d3ee" opacity="0.1"/>
+            <circle cx="70" cy="105" r="1.6" fill="#22d3ee" opacity="0.09"/>
+            <circle cx="68" cy="50" r="1.4" fill="#22d3ee" opacity="0.08"/>
+            <circle cx="72" cy="130" r="1.5" fill="#22d3ee" opacity="0.08"/>
+            <circle cx="78" cy="78" r="1.8" fill="#22d3ee" opacity="0.1"/>
+            <circle cx="82" cy="95" r="1.7" fill="#22d3ee" opacity="0.1"/>
+            <circle cx="80" cy="58" r="1.5" fill="#22d3ee" opacity="0.09"/>
+            <circle cx="85" cy="118" r="1.6" fill="#22d3ee" opacity="0.09"/>
+          </g>
+
+          <!-- FORMING ZONE — clearer structure, tail taking shape -->
+          <g id="forming">
+            <line x1="95" y1="82" x2="110" y2="80" stroke="#22d3ee" stroke-width="0.7" opacity="0.12"/>
+            <line x1="95" y1="82" x2="105" y2="72" stroke="#22d3ee" stroke-width="0.6" opacity="0.1"/>
+            <line x1="95" y1="82" x2="105" y2="92" stroke="#22d3ee" stroke-width="0.6" opacity="0.1"/>
+            <line x1="105" y1="72" x2="110" y2="80" stroke="#22d3ee" stroke-width="0.6" opacity="0.1"/>
+            <line x1="105" y1="92" x2="110" y2="80" stroke="#22d3ee" stroke-width="0.6" opacity="0.1"/>
+            <line x1="110" y1="80" x2="125" y2="78" stroke="#22d3ee" stroke-width="0.8" opacity="0.15"/>
+            <line x1="105" y1="72" x2="118" y2="65" stroke="#22d3ee" stroke-width="0.6" opacity="0.1"/>
+            <line x1="105" y1="92" x2="118" y2="95" stroke="#22d3ee" stroke-width="0.6" opacity="0.1"/>
+            <!-- Stray forming dots -->
+            <circle cx="92" cy="45" r="1.2" fill="#22d3ee" opacity="0.07"/>
+            <circle cx="98" cy="140" r="1.1" fill="#22d3ee" opacity="0.06"/>
+            <circle cx="88" cy="62" r="1.3" fill="#22d3ee" opacity="0.08"/>
+            <!-- Structure nodes -->
+            <circle cx="95" cy="82" r="2" fill="#22d3ee" opacity="0.15"/>
+            <circle cx="105" cy="72" r="1.8" fill="#22d3ee" opacity="0.13"/>
+            <circle cx="105" cy="92" r="1.8" fill="#22d3ee" opacity="0.13"/>
+            <circle cx="110" cy="80" r="2.2" fill="#22d3ee" opacity="0.18"/>
+            <circle cx="118" cy="65" r="1.5" fill="#22d3ee" opacity="0.12"/>
+            <circle cx="118" cy="95" r="1.5" fill="#22d3ee" opacity="0.12"/>
+          </g>
+
+          <!-- BODY ZONE — clear fish body with mesh -->
+          <g id="fish-body">
+            <!-- Spine -->
+            <line x1="125" y1="78" x2="150" y2="80" stroke="#22d3ee" stroke-width="1" opacity="0.22"/>
+            <line x1="150" y1="80" x2="178" y2="82" stroke="#22d3ee" stroke-width="1.1" opacity="0.28"/>
+            <line x1="178" y1="82" x2="205" y2="82" stroke="#22d3ee" stroke-width="1.2" opacity="0.32"/>
+            <line x1="205" y1="82" x2="230" y2="80" stroke="#22d3ee" stroke-width="1.3" opacity="0.38"/>
+            <!-- Dorsal -->
+            <line x1="125" y1="78" x2="130" y2="68" stroke="#22d3ee" stroke-width="0.8" opacity="0.18"/>
+            <line x1="150" y1="80" x2="152" y2="65" stroke="#22d3ee" stroke-width="0.9" opacity="0.22"/>
+            <line x1="178" y1="82" x2="178" y2="66" stroke="#22d3ee" stroke-width="1" opacity="0.26"/>
+            <line x1="205" y1="82" x2="204" y2="68" stroke="#22d3ee" stroke-width="1.1" opacity="0.3"/>
+            <line x1="130" y1="68" x2="152" y2="65" stroke="#22d3ee" stroke-width="0.7" opacity="0.16"/>
+            <line x1="152" y1="65" x2="178" y2="66" stroke="#22d3ee" stroke-width="0.8" opacity="0.2"/>
+            <line x1="178" y1="66" x2="204" y2="68" stroke="#22d3ee" stroke-width="0.9" opacity="0.24"/>
+            <!-- Fin tips -->
+            <line x1="152" y1="65" x2="155" y2="52" stroke="#22d3ee" stroke-width="0.5" opacity="0.1"/>
+            <line x1="178" y1="66" x2="176" y2="50" stroke="#22d3ee" stroke-width="0.6" opacity="0.12"/>
+            <line x1="204" y1="68" x2="200" y2="55" stroke="#22d3ee" stroke-width="0.5" opacity="0.1"/>
+            <!-- Belly -->
+            <line x1="125" y1="78" x2="128" y2="92" stroke="#22d3ee" stroke-width="0.8" opacity="0.18"/>
+            <line x1="150" y1="80" x2="152" y2="96" stroke="#22d3ee" stroke-width="0.9" opacity="0.22"/>
+            <line x1="178" y1="82" x2="178" y2="100" stroke="#22d3ee" stroke-width="1" opacity="0.26"/>
+            <line x1="205" y1="82" x2="204" y2="98" stroke="#22d3ee" stroke-width="1.1" opacity="0.3"/>
+            <line x1="128" y1="92" x2="152" y2="96" stroke="#22d3ee" stroke-width="0.7" opacity="0.16"/>
+            <line x1="152" y1="96" x2="178" y2="100" stroke="#22d3ee" stroke-width="0.8" opacity="0.2"/>
+            <line x1="178" y1="100" x2="204" y2="98" stroke="#22d3ee" stroke-width="0.9" opacity="0.24"/>
+            <!-- Ventral tips -->
+            <line x1="152" y1="96" x2="155" y2="112" stroke="#22d3ee" stroke-width="0.5" opacity="0.1"/>
+            <line x1="178" y1="100" x2="178" y2="116" stroke="#22d3ee" stroke-width="0.6" opacity="0.12"/>
+            <!-- Diagonal mesh -->
+            <line x1="130" y1="68" x2="150" y2="80" stroke="#22d3ee" stroke-width="0.6" opacity="0.12"/>
+            <line x1="152" y1="65" x2="178" y2="82" stroke="#22d3ee" stroke-width="0.7" opacity="0.16"/>
+            <line x1="178" y1="66" x2="205" y2="82" stroke="#22d3ee" stroke-width="0.8" opacity="0.2"/>
+            <line x1="128" y1="92" x2="150" y2="80" stroke="#22d3ee" stroke-width="0.6" opacity="0.12"/>
+            <line x1="152" y1="96" x2="178" y2="82" stroke="#22d3ee" stroke-width="0.7" opacity="0.16"/>
+            <line x1="178" y1="100" x2="205" y2="82" stroke="#22d3ee" stroke-width="0.8" opacity="0.2"/>
+            <!-- Body nodes -->
+            <circle cx="125" cy="78" r="2.5" fill="#22d3ee" opacity="0.22"/>
+            <circle cx="130" cy="68" r="2" fill="#22d3ee" opacity="0.2"/>
+            <circle cx="128" cy="92" r="2" fill="#22d3ee" opacity="0.2"/>
+            <circle cx="150" cy="80" r="2.8" fill="#22d3ee" opacity="0.28"/>
+            <circle cx="152" cy="65" r="2.2" fill="#22d3ee" opacity="0.24"/>
+            <circle cx="152" cy="96" r="2.2" fill="#22d3ee" opacity="0.24"/>
+            <circle cx="178" cy="82" r="3" fill="#22d3ee" opacity="0.32"/>
+            <circle cx="178" cy="66" r="2.5" fill="#22d3ee" opacity="0.28"/>
+            <circle cx="178" cy="100" r="2.5" fill="#22d3ee" opacity="0.28"/>
+            <circle cx="205" cy="82" r="3.2" fill="#22d3ee" opacity="0.38"/>
+            <circle cx="204" cy="68" r="2.8" fill="#22d3ee" opacity="0.32"/>
+            <circle cx="204" cy="98" r="2.8" fill="#22d3ee" opacity="0.32"/>
+            <!-- Fin tip nodes -->
+            <circle cx="155" cy="52" r="1.3" fill="#22d3ee" opacity="0.12"/>
+            <circle cx="176" cy="50" r="1.5" fill="#22d3ee" opacity="0.14"/>
+            <circle cx="200" cy="55" r="1.3" fill="#22d3ee" opacity="0.12"/>
+            <circle cx="155" cy="112" r="1.3" fill="#22d3ee" opacity="0.12"/>
+            <circle cx="178" cy="116" r="1.5" fill="#22d3ee" opacity="0.14"/>
+          </g>
+
+          <!-- HEAD — dense, bright -->
+          <g id="fish-head">
+            <line x1="230" y1="80" x2="248" y2="76" stroke="#22d3ee" stroke-width="1.5" opacity="0.45"/>
+            <line x1="230" y1="80" x2="248" y2="80" stroke="#22d3ee" stroke-width="1.5" opacity="0.48"/>
+            <line x1="230" y1="80" x2="248" y2="84" stroke="#22d3ee" stroke-width="1.5" opacity="0.45"/>
+            <line x1="204" y1="68" x2="230" y2="80" stroke="#22d3ee" stroke-width="1.2" opacity="0.35"/>
+            <line x1="204" y1="98" x2="230" y2="80" stroke="#22d3ee" stroke-width="1.2" opacity="0.35"/>
+            <line x1="248" y1="76" x2="262" y2="76" stroke="#22d3ee" stroke-width="1.5" opacity="0.52"/>
+            <line x1="248" y1="80" x2="262" y2="79" stroke="#22d3ee" stroke-width="1.6" opacity="0.55"/>
+            <line x1="248" y1="84" x2="262" y2="82" stroke="#22d3ee" stroke-width="1.5" opacity="0.52"/>
+            <line x1="262" y1="76" x2="275" y2="78" stroke="#22d3ee" stroke-width="1.4" opacity="0.5"/>
+            <line x1="262" y1="79" x2="275" y2="79" stroke="#22d3ee" stroke-width="1.5" opacity="0.55"/>
+            <line x1="262" y1="82" x2="275" y2="80" stroke="#22d3ee" stroke-width="1.4" opacity="0.5"/>
+            <line x1="275" y1="78" x2="285" y2="79" stroke="#22d3ee" stroke-width="1.2" opacity="0.45"/>
+            <line x1="275" y1="80" x2="285" y2="79" stroke="#22d3ee" stroke-width="1.2" opacity="0.45"/>
+            <line x1="248" y1="76" x2="248" y2="84" stroke="#22d3ee" stroke-width="1" opacity="0.35"/>
+            <line x1="262" y1="76" x2="262" y2="82" stroke="#22d3ee" stroke-width="1.1" opacity="0.4"/>
+            <!-- Head nodes -->
+            <circle cx="230" cy="80" r="3.5" fill="#22d3ee" opacity="0.45"/>
+            <circle cx="248" cy="76" r="3.2" fill="#22d3ee" opacity="0.52"/>
+            <circle cx="248" cy="80" r="3.5" fill="#22d3ee" opacity="0.55"/>
+            <circle cx="248" cy="84" r="3.2" fill="#22d3ee" opacity="0.52"/>
+            <circle cx="262" cy="76" r="3" fill="#22d3ee" opacity="0.58"/>
+            <circle cx="262" cy="79" r="3.2" fill="#22d3ee" opacity="0.62"/>
+            <circle cx="262" cy="82" r="3" fill="#22d3ee" opacity="0.58"/>
+            <circle cx="275" cy="78" r="2.8" fill="#22d3ee" opacity="0.6"/>
+            <circle cx="275" cy="80" r="2.8" fill="#22d3ee" opacity="0.6"/>
+            <circle cx="285" cy="79" r="2.2" fill="#22d3ee" opacity="0.5"/>
+          </g>
+
+          <!-- EYE -->
+          <g id="fish-eye" class="eye-pulse">
+            <circle cx="265" cy="77" r="12" fill="url(#eye-glow-a)"/>
+            <circle cx="265" cy="77" r="5.5" fill="#22d3ee"/>
+            <circle cx="265" cy="77" r="8.5" fill="none" stroke="#22d3ee" stroke-width="0.8" opacity="0.2"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="logo-row">
+    <div class="logo-display">
+      <label>Horizontal lockup</label>
+      <div class="logo-card sm">
+        <div class="combo">
+          <svg width="140" height="72" viewBox="0 0 380 200" xmlns="http://www.w3.org/2000/svg">
+            <!-- Simplified emergence -->
+            <circle cx="30" cy="80" r="1.5" fill="#22d3ee" opacity="0.06"/>
+            <circle cx="42" cy="60" r="1.3" fill="#22d3ee" opacity="0.06"/>
+            <circle cx="38" cy="105" r="1.2" fill="#22d3ee" opacity="0.05"/>
+            <circle cx="55" cy="72" r="1.5" fill="#22d3ee" opacity="0.07"/>
+            <circle cx="52" cy="95" r="1.4" fill="#22d3ee" opacity="0.07"/>
+            <circle cx="65" cy="85" r="1.8" fill="#22d3ee" opacity="0.08"/>
+            <line x1="80" y1="82" x2="110" y2="80" stroke="#22d3ee" stroke-width="0.8" opacity="0.12"/>
+            <circle cx="80" cy="82" r="2" fill="#22d3ee" opacity="0.12"/>
+            <circle cx="95" cy="72" r="1.8" fill="#22d3ee" opacity="0.12"/>
+            <circle cx="95" cy="92" r="1.8" fill="#22d3ee" opacity="0.12"/>
+            <line x1="110" y1="80" x2="150" y2="80" stroke="#22d3ee" stroke-width="1" opacity="0.2"/>
+            <line x1="150" y1="80" x2="205" y2="82" stroke="#22d3ee" stroke-width="1.2" opacity="0.3"/>
+            <line x1="205" y1="82" x2="248" y2="80" stroke="#22d3ee" stroke-width="1.4" opacity="0.42"/>
+            <line x1="248" y1="80" x2="275" y2="79" stroke="#22d3ee" stroke-width="1.5" opacity="0.52"/>
+            <circle cx="110" cy="80" r="2.5" fill="#22d3ee" opacity="0.2"/>
+            <circle cx="150" cy="80" r="3" fill="#22d3ee" opacity="0.28"/>
+            <circle cx="178" cy="82" r="3" fill="#22d3ee" opacity="0.32"/>
+            <circle cx="205" cy="82" r="3.5" fill="#22d3ee" opacity="0.4"/>
+            <circle cx="230" cy="80" r="3.8" fill="#22d3ee" opacity="0.48"/>
+            <circle cx="248" cy="80" r="4" fill="#22d3ee" opacity="0.55"/>
+            <circle cx="262" cy="79" r="4" fill="#22d3ee" opacity="0.62"/>
+            <circle cx="265" cy="77" r="6" fill="#22d3ee" opacity="0.92"/>
+          </svg>
+          <span class="wm"><span class="d">Deep</span>Miro</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════════════
+     VARIATION C: THE MIRROR
+     Two fish facing each other — one detailed, one reflected/ghostly.
+     Honors "Miro" (mirror) in the name. Symmetry = prediction
+     mirroring reality.
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="concept">
+  <div>
+    <div class="concept-header">
+      <span class="concept-number">C</span>
+      <span class="concept-title">The Mirror</span>
+    </div>
+    <p class="concept-desc">
+      Two shoals face each other across a vertical axis — one solid (reality), one ghostly (the prediction/mirror).
+      Honors the "Miro" (mirror) in both MiroFish and DeepMiro. The reflection isn't perfect —
+      it's a prediction, not a copy.
+    </p>
+  </div>
+
+  <div class="logo-row">
+    <div class="logo-display">
+      <label>Full mark</label>
+      <div class="logo-card mark-glow">
+        <svg width="220" height="140" viewBox="0 0 280 180" xmlns="http://www.w3.org/2000/svg">
+          <!-- Mirror axis -->
+          <line x1="140" y1="20" x2="140" y2="160" stroke="#22d3ee" stroke-width="0.5" opacity="0.08" stroke-dasharray="4 4"/>
+
+          <!-- LEFT FISH (solid/reality) — swims toward center -->
+          <g id="real-fish">
+            <!-- Tail -->
+            <line x1="18" y1="75" x2="30" y2="82" stroke="#22d3ee" stroke-width="0.7" opacity="0.15"/>
+            <line x1="18" y1="95" x2="30" y2="88" stroke="#22d3ee" stroke-width="0.7" opacity="0.15"/>
+            <line x1="30" y1="82" x2="30" y2="88" stroke="#22d3ee" stroke-width="0.6" opacity="0.12"/>
+            <circle cx="18" cy="75" r="1.5" fill="#22d3ee" opacity="0.12"/>
+            <circle cx="18" cy="95" r="1.5" fill="#22d3ee" opacity="0.12"/>
+            <circle cx="30" cy="82" r="2" fill="#22d3ee" opacity="0.18"/>
+            <circle cx="30" cy="88" r="2" fill="#22d3ee" opacity="0.18"/>
+            <!-- Body -->
+            <line x1="30" y1="85" x2="52" y2="85" stroke="#22d3ee" stroke-width="1" opacity="0.25"/>
+            <line x1="52" y1="85" x2="75" y2="85" stroke="#22d3ee" stroke-width="1.1" opacity="0.32"/>
+            <line x1="75" y1="85" x2="95" y2="85" stroke="#22d3ee" stroke-width="1.3" opacity="0.4"/>
+            <line x1="52" y1="85" x2="55" y2="72" stroke="#22d3ee" stroke-width="0.8" opacity="0.2"/>
+            <line x1="52" y1="85" x2="55" y2="98" stroke="#22d3ee" stroke-width="0.8" opacity="0.2"/>
+            <line x1="75" y1="85" x2="76" y2="72" stroke="#22d3ee" stroke-width="0.9" opacity="0.25"/>
+            <line x1="75" y1="85" x2="76" y2="98" stroke="#22d3ee" stroke-width="0.9" opacity="0.25"/>
+            <line x1="55" y1="72" x2="76" y2="72" stroke="#22d3ee" stroke-width="0.7" opacity="0.18"/>
+            <line x1="55" y1="98" x2="76" y2="98" stroke="#22d3ee" stroke-width="0.7" opacity="0.18"/>
+            <circle cx="52" cy="85" r="2.5" fill="#22d3ee" opacity="0.28"/>
+            <circle cx="55" cy="72" r="2" fill="#22d3ee" opacity="0.22"/>
+            <circle cx="55" cy="98" r="2" fill="#22d3ee" opacity="0.22"/>
+            <circle cx="75" cy="85" r="3" fill="#22d3ee" opacity="0.38"/>
+            <circle cx="76" cy="72" r="2.5" fill="#22d3ee" opacity="0.3"/>
+            <circle cx="76" cy="98" r="2.5" fill="#22d3ee" opacity="0.3"/>
+            <!-- Head -->
+            <line x1="95" y1="85" x2="110" y2="82" stroke="#22d3ee" stroke-width="1.4" opacity="0.48"/>
+            <line x1="95" y1="85" x2="110" y2="88" stroke="#22d3ee" stroke-width="1.4" opacity="0.48"/>
+            <line x1="110" y1="82" x2="122" y2="84" stroke="#22d3ee" stroke-width="1.5" opacity="0.55"/>
+            <line x1="110" y1="88" x2="122" y2="86" stroke="#22d3ee" stroke-width="1.5" opacity="0.55"/>
+            <circle cx="95" cy="85" r="3.5" fill="#22d3ee" opacity="0.48"/>
+            <circle cx="110" cy="82" r="3" fill="#22d3ee" opacity="0.55"/>
+            <circle cx="110" cy="88" r="3" fill="#22d3ee" opacity="0.55"/>
+            <circle cx="122" cy="85" r="2.5" fill="#22d3ee" opacity="0.5"/>
+            <!-- Eye -->
+            <circle cx="115" cy="83" r="5" fill="#22d3ee" opacity="0.9"/>
+            <circle cx="115" cy="83" r="8" fill="none" stroke="#22d3ee" stroke-width="0.8" opacity="0.2"/>
+          </g>
+
+          <!-- RIGHT FISH (ghostly/prediction) — mirror of left, less opacity, slightly different -->
+          <g id="mirror-fish" opacity="0.45">
+            <!-- Tail (mirrored) -->
+            <line x1="262" y1="78" x2="250" y2="84" stroke="#22d3ee" stroke-width="0.7" opacity="0.15"/>
+            <line x1="262" y1="98" x2="250" y2="90" stroke="#22d3ee" stroke-width="0.7" opacity="0.15"/>
+            <circle cx="262" cy="78" r="1.5" fill="#22d3ee" opacity="0.12"/>
+            <circle cx="262" cy="98" r="1.5" fill="#22d3ee" opacity="0.12"/>
+            <circle cx="250" cy="84" r="2" fill="#22d3ee" opacity="0.18"/>
+            <circle cx="250" cy="90" r="2" fill="#22d3ee" opacity="0.18"/>
+            <!-- Body -->
+            <line x1="250" y1="87" x2="228" y2="88" stroke="#22d3ee" stroke-width="1" opacity="0.25"/>
+            <line x1="228" y1="88" x2="205" y2="88" stroke="#22d3ee" stroke-width="1.1" opacity="0.32"/>
+            <line x1="205" y1="88" x2="185" y2="87" stroke="#22d3ee" stroke-width="1.3" opacity="0.4"/>
+            <line x1="228" y1="88" x2="226" y2="75" stroke="#22d3ee" stroke-width="0.8" opacity="0.2"/>
+            <line x1="228" y1="88" x2="226" y2="102" stroke="#22d3ee" stroke-width="0.8" opacity="0.2"/>
+            <line x1="205" y1="88" x2="204" y2="75" stroke="#22d3ee" stroke-width="0.9" opacity="0.25"/>
+            <line x1="205" y1="88" x2="204" y2="102" stroke="#22d3ee" stroke-width="0.9" opacity="0.25"/>
+            <circle cx="228" cy="88" r="2.5" fill="#22d3ee" opacity="0.28"/>
+            <circle cx="226" cy="75" r="2" fill="#22d3ee" opacity="0.22"/>
+            <circle cx="226" cy="102" r="2" fill="#22d3ee" opacity="0.22"/>
+            <circle cx="205" cy="88" r="3" fill="#22d3ee" opacity="0.38"/>
+            <circle cx="204" cy="75" r="2.5" fill="#22d3ee" opacity="0.3"/>
+            <circle cx="204" cy="102" r="2.5" fill="#22d3ee" opacity="0.3"/>
+            <!-- Head -->
+            <line x1="185" y1="87" x2="170" y2="84" stroke="#22d3ee" stroke-width="1.4" opacity="0.48"/>
+            <line x1="185" y1="87" x2="170" y2="90" stroke="#22d3ee" stroke-width="1.4" opacity="0.48"/>
+            <line x1="170" y1="84" x2="158" y2="86" stroke="#22d3ee" stroke-width="1.5" opacity="0.55"/>
+            <line x1="170" y1="90" x2="158" y2="88" stroke="#22d3ee" stroke-width="1.5" opacity="0.55"/>
+            <circle cx="185" cy="87" r="3.5" fill="#22d3ee" opacity="0.48"/>
+            <circle cx="170" cy="84" r="3" fill="#22d3ee" opacity="0.55"/>
+            <circle cx="170" cy="90" r="3" fill="#22d3ee" opacity="0.55"/>
+            <circle cx="158" cy="87" r="2.5" fill="#22d3ee" opacity="0.5"/>
+            <!-- Eye -->
+            <circle cx="165" cy="85" r="5" fill="#22d3ee" opacity="0.9"/>
+            <circle cx="165" cy="85" r="8" fill="none" stroke="#22d3ee" stroke-width="0.8" opacity="0.2"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <div class="logo-display">
+      <label>Horizontal lockup</label>
+      <div class="logo-card sm">
+        <div class="combo">
+          <svg width="110" height="70" viewBox="0 0 280 180" xmlns="http://www.w3.org/2000/svg">
+            <line x1="140" y1="30" x2="140" y2="150" stroke="#22d3ee" stroke-width="0.5" opacity="0.06" stroke-dasharray="3 3"/>
+            <!-- Left simplified -->
+            <circle cx="30" cy="82" r="2" fill="#22d3ee" opacity="0.15"/>
+            <circle cx="52" cy="85" r="2.5" fill="#22d3ee" opacity="0.25"/>
+            <circle cx="75" cy="85" r="3" fill="#22d3ee" opacity="0.35"/>
+            <circle cx="95" cy="85" r="3.5" fill="#22d3ee" opacity="0.45"/>
+            <circle cx="115" cy="83" r="5" fill="#22d3ee" opacity="0.9"/>
+            <line x1="30" y1="82" x2="115" y2="83" stroke="#22d3ee" stroke-width="1" opacity="0.15"/>
+            <!-- Right simplified (ghostly) -->
+            <circle cx="250" cy="87" r="2" fill="#22d3ee" opacity="0.08"/>
+            <circle cx="228" cy="88" r="2.5" fill="#22d3ee" opacity="0.12"/>
+            <circle cx="205" cy="88" r="3" fill="#22d3ee" opacity="0.16"/>
+            <circle cx="185" cy="87" r="3.5" fill="#22d3ee" opacity="0.2"/>
+            <circle cx="165" cy="85" r="5" fill="#22d3ee" opacity="0.4"/>
+            <line x1="250" y1="87" x2="165" y2="85" stroke="#22d3ee" stroke-width="1" opacity="0.08"/>
+          </svg>
+          <span class="wm"><span class="d">Deep</span>Miro</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="logo-display">
+      <label>Favicon</label>
+      <div class="logo-card tiny">
+        <svg width="32" height="32" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <line x1="50" y1="15" x2="50" y2="85" stroke="#22d3ee" stroke-width="0.8" opacity="0.06"/>
+          <!-- Left eye -->
+          <circle cx="38" cy="48" r="8" fill="#22d3ee" opacity="0.85"/>
+          <circle cx="26" cy="48" r="4" fill="#22d3ee" opacity="0.3"/>
+          <circle cx="18" cy="48" r="2.5" fill="#22d3ee" opacity="0.15"/>
+          <!-- Right eye (ghost) -->
+          <circle cx="62" cy="52" r="8" fill="#22d3ee" opacity="0.35"/>
+          <circle cx="74" cy="52" r="4" fill="#22d3ee" opacity="0.12"/>
+          <circle cx="82" cy="52" r="2.5" fill="#22d3ee" opacity="0.06"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div style="text-align:center; margin-top:5rem; padding: 2rem;">
+  <p style="font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:#4a4a58;">
+    all marks designed for deepmiro.org &mdash; cyan #22d3ee on #07070a
+  </p>
+</div>
+
+</body>
+</html>
