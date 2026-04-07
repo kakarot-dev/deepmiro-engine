@@ -617,6 +617,17 @@ Write a "Future Prediction Report" answering:
 2. How did various types of Agents (populations) react and act?
 3. What noteworthy future trends and risks does this simulation reveal?
 
+[CRITICAL: Use Simulation Data]
+You have access to REAL simulation data tools. You MUST use them:
+- **get_agent_posts**: Get REAL posts written by agents. Quote them directly.
+- **get_agent_activity**: See who was most active, who lurked, action counts.
+- **get_trending_posts**: Find content that got the most engagement.
+- **get_round_summary**: See how activity changed over time.
+- **get_simulation_actions**: Get raw actions filtered by agent/platform/type.
+
+DO NOT make up quotes. Every quote in the report must come from get_agent_posts
+or get_simulation_actions. Use the agent's REAL name, not "A Government Agent".
+
 [Report Positioning]
 - This is a simulation-based future prediction report revealing "if this happens, \
 what will the future look like"
@@ -857,9 +868,11 @@ Completed section content (please read carefully to avoid repetition):
 
 [Important Reminders]
 1. Carefully read the completed sections above to avoid repeating the same content!
-2. You must call tools to obtain simulation data before starting
-3. Please mix different tools; do not use only one type
-4. Report content must come from retrieval results; do not use your own knowledge
+2. FIRST call get_agent_posts and get_agent_activity to get REAL simulation data
+3. Use get_trending_posts to find viral content to highlight
+4. Every quote MUST come from actual agent posts — use their real names
+5. Mix simulation data tools with graph search tools for context
+6. Do NOT fabricate quotes — only cite what agents actually wrote
 
 [Format Warning -- Must Follow]
 - Do NOT write any headings (#, ##, ###, #### are all prohibited)
