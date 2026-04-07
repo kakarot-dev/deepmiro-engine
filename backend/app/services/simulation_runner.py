@@ -341,8 +341,19 @@ class SimulationRunner:
 
         cls._run_states[state.simulation_id] = state
 
-        # SurrealDB write (best-effort)
-        storage = _get_surreal_storage()
+        # SurrealDB write (best-effort, thread-safe)
+        import threading
+        try:
+            if threading.current_thread() is threading.main_thread():
+                storage = _get_surreal_storage()
+            else:
+                from ..storage.surrealdb_backend import SurrealDBStorage
+                from ..config import Config
+                http_url = Config.SURREAL_URL.replace("ws://", "http://").replace("wss://", "https://")
+                storage = SurrealDBStorage(url=http_url)
+        except Exception:
+            storage = None
+
         if storage:
             try:
                 updates = {
