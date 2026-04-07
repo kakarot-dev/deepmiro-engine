@@ -30,6 +30,8 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         component: backend
     spec:
+      imagePullSecrets:
+      - name: ghcr-creds
       containers:
       - name: backend
         image: {{ .Values.backend.image }}

@@ -17,6 +17,8 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         component: mcp
     spec:
+      imagePullSecrets:
+      - name: ghcr-creds
       containers:
       - name: mcp
         image: {{ .Values.mcp.image }}

@@ -1,5 +1,5 @@
 backend:
-  image: ghcr.io/kakarot-dev/deepmiro-backend:v0.4.2
+  image: ghcr.io/kakarot-dev/deepmiro-backend:latest
   imagePullPolicy: Always
   port: 5001
   resources:
