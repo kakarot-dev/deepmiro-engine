@@ -1,203 +1,179 @@
 <div align="center">
 
-<img src="./static/image/MiroFish_logo_compressed.jpeg" alt="MiroFish Logo" width="75%"/>
+<img src="./static/image/deepmiro-mark.png" alt="DeepMiro" width="180"/>
 
-<a href="https://trendshift.io/repositories/16144" target="_blank"><img src="https://trendshift.io/api/badge/repositories/16144" alt="666ghj%2FMiroFish | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+# DeepMiro Engine
 
-简洁通用的群体智能引擎，预测万物
-</br>
-<em>A Simple and Universal Swarm Intelligence Engine, Predicting Anything</em>
+**A swarm intelligence engine that rehearses the future.**
 
-<a href="https://www.shanda.com/" target="_blank"><img src="./static/image/shanda_logo.png" alt="666ghj%2MiroFish | Shanda" height="40"/></a>
+Feed it a document. Describe a scenario. Watch thousands of AI agents with distinct personalities, memories, and social instincts interact — and return with a prediction.
 
-[![GitHub Stars](https://img.shields.io/github/stars/666ghj/MiroFish?style=flat-square&color=DAA520)](https://github.com/666ghj/MiroFish/stargazers)
-[![GitHub Watchers](https://img.shields.io/github/watchers/666ghj/MiroFish?style=flat-square)](https://github.com/666ghj/MiroFish/watchers)
-[![GitHub Forks](https://img.shields.io/github/forks/666ghj/MiroFish?style=flat-square)](https://github.com/666ghj/MiroFish/network)
-[![Docker](https://img.shields.io/badge/Docker-Build-2496ED?style=flat-square&logo=docker&logoColor=white)](https://hub.docker.com/)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/666ghj/MiroFish)
-
-[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white)](http://discord.gg/ePf5aPaHnA)
-[![X](https://img.shields.io/badge/X-Follow-000000?style=flat-square&logo=x&logoColor=white)](https://x.com/mirofish_ai)
-[![Instagram](https://img.shields.io/badge/Instagram-Follow-E4405F?style=flat-square&logo=instagram&logoColor=white)](https://www.instagram.com/mirofish_ai/)
-
-[English](./README.md) | [中文文档](./README-ZH.md)
+[![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=flat-square)](./LICENSE)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](#docker-deployment)
+[![Website](https://img.shields.io/badge/deepmiro.org-live-22d3ee?style=flat-square)](https://deepmiro.org)
 
 </div>
 
-## ⚡ Overview
+---
 
-**MiroFish** is a next-generation AI prediction engine powered by multi-agent technology. By extracting seed information from the real world (such as breaking news, policy drafts, or financial signals), it automatically constructs a high-fidelity parallel digital world. Within this space, thousands of intelligent agents with independent personalities, long-term memory, and behavioral logic freely interact and undergo social evolution. You can inject variables dynamically from a "God's-eye view" to precisely deduce future trajectories — **rehearse the future in a digital sandbox, and win decisions after countless simulations**.
+## What It Does
 
-> You only need to: Upload seed materials (data analysis reports or interesting novel stories) and describe your prediction requirements in natural language</br>
-> MiroFish will return: A detailed prediction report and a deeply interactive high-fidelity digital world
+DeepMiro extracts entities and relationships from any document — a policy draft, a market report, a chapter of a novel — and constructs a parallel digital world. Inside it, hundreds of autonomous agents form opinions, argue on simulated social platforms, shift allegiances, and produce emergent behavior that no single prompt could predict.
 
-### Our Vision
+You get back a structured prediction report and a living world you can interrogate, agent by agent.
 
-MiroFish is dedicated to creating a swarm intelligence mirror that maps reality. By capturing the collective emergence triggered by individual interactions, we break through the limitations of traditional prediction:
+**Input:** A PDF and a question in plain language.
+**Output:** A detailed prediction report + an interactive simulation you can explore.
 
-- **At the Macro Level**: We are a rehearsal laboratory for decision-makers, allowing policies and public relations to be tested at zero risk
-- **At the Micro Level**: We are a creative sandbox for individual users — whether deducing novel endings or exploring imaginative scenarios, everything can be fun, playful, and accessible
+## How It Works
 
-From serious predictions to playful simulations, we let every "what if" see its outcome, making it possible to predict anything.
-
-## 🌐 Live Demo
-
-Welcome to visit our online demo environment and experience a prediction simulation on trending public opinion events we've prepared for you: [mirofish-live-demo](https://666ghj.github.io/mirofish-demo/)
-
-## 📸 Screenshots
-
-<div align="center">
-<table>
-<tr>
-<td><img src="./static/image/Screenshot/运行截图1.png" alt="Screenshot 1" width="100%"/></td>
-<td><img src="./static/image/Screenshot/运行截图2.png" alt="Screenshot 2" width="100%"/></td>
-</tr>
-<tr>
-<td><img src="./static/image/Screenshot/运行截图3.png" alt="Screenshot 3" width="100%"/></td>
-<td><img src="./static/image/Screenshot/运行截图4.png" alt="Screenshot 4" width="100%"/></td>
-</tr>
-<tr>
-<td><img src="./static/image/Screenshot/运行截图5.png" alt="Screenshot 5" width="100%"/></td>
-<td><img src="./static/image/Screenshot/运行截图6.png" alt="Screenshot 6" width="100%"/></td>
-</tr>
-</table>
-</div>
-
-## 🎬 Demo Videos
-
-### 1. Wuhan University Public Opinion Simulation + MiroFish Project Introduction
-
-<div align="center">
-<a href="https://www.bilibili.com/video/BV1VYBsBHEMY/" target="_blank"><img src="./static/image/武大模拟演示封面.png" alt="MiroFish Demo Video" width="75%"/></a>
-
-Click the image to watch the complete demo video for prediction using BettaFish-generated "Wuhan University Public Opinion Report"
-</div>
-
-### 2. Dream of the Red Chamber Lost Ending Simulation
-
-<div align="center">
-<a href="https://www.bilibili.com/video/BV1cPk3BBExq" target="_blank"><img src="./static/image/红楼梦模拟推演封面.jpg" alt="MiroFish Demo Video" width="75%"/></a>
-
-Click the image to watch MiroFish's deep prediction of the lost ending based on hundreds of thousands of words from the first 80 chapters of "Dream of the Red Chamber"
-</div>
-
-> **Financial Prediction**, **Political News Prediction** and more examples coming soon...
-
-## 🔄 Workflow
-
-1. **Graph Building**: Seed extraction & Individual/collective memory injection & GraphRAG construction
-2. **Environment Setup**: Entity relationship extraction & Persona generation & Agent configuration injection
-3. **Simulation**: Dual-platform parallel simulation & Auto-parse prediction requirements & Dynamic temporal memory updates
-4. **Report Generation**: ReportAgent with rich toolset for deep interaction with post-simulation environment
-5. **Deep Interaction**: Chat with any agent in the simulated world & Interact with ReportAgent
-
-## 🚀 Quick Start
-
-### Option 1: Source Code Deployment (Recommended)
-
-#### Prerequisites
-
-| Tool | Version | Description | Check Installation |
-|------|---------|-------------|-------------------|
-| **Node.js** | 18+ | Frontend runtime, includes npm | `node -v` |
-| **Python** | ≥3.11, ≤3.12 | Backend runtime | `python --version` |
-| **uv** | Latest | Python package manager | `uv --version` |
-
-#### 1. Configure Environment Variables
-
-```bash
-# Copy the example configuration file
-cp .env.example .env
-
-# Edit the .env file and fill in the required API keys
+```
+Document ──► Entity Extraction ──► Agent Generation ──► Dual-Platform Simulation ──► Prediction Report
+              (NER + GraphRAG)    (personas, memory,     (Twitter-like + Reddit-like     (ReportAgent with
+                                   social networks)       parallel interaction)            deep analysis tools)
 ```
 
-**Required Environment Variables:**
+Five phases, fully automated:
+
+| Phase | What happens |
+|-------|-------------|
+| **Graph Build** | Extracts entities, relationships, and context from your documents. Builds a knowledge graph via GraphRAG. |
+| **Environment Setup** | Generates agent personas with distinct personalities, beliefs, and social connections. Configures behavioral parameters. |
+| **Simulation** | Agents interact across dual platforms (Twitter-like and Reddit-like) in parallel. Dynamic memory updates each round. |
+| **Report Generation** | A ReportAgent analyzes the post-simulation environment — sentiment shifts, faction formation, viral dynamics, outcome trajectories. |
+| **Deep Interaction** | Chat with any agent to understand their reasoning. Query the ReportAgent for follow-up analysis. |
+
+## Key Capabilities
+
+- **Document-seeded worlds** — upload PDFs, reports, articles. The engine extracts reality seeds and builds a simulation around them.
+- **Autonomous agents** — each agent has a unique persona, long-term memory, and behavioral logic. They aren't scripted — they emerge.
+- **Dual-platform dynamics** — agents interact on both a Twitter-like and Reddit-like platform simultaneously, producing richer social dynamics.
+- **God's-eye control** — inject variables mid-simulation, adjust scenarios, test counterfactuals.
+- **Structured reports** — the ReportAgent produces analysis with sentiment breakdowns, key faction identification, and outcome probabilities.
+- **Agent interrogation** — after simulation, interview any agent to understand their beliefs and decision process.
+
+## Performance
+
+Benchmarked on a 15-agent quick simulation with enriched prompts:
+
+| Stage | Time |
+|-------|------|
+| Graph build | ~10s |
+| Agent generation | ~3 min |
+| Simulation (110 Twitter + 26 Reddit actions) | ~4 min |
+| **Total pipeline** | **~7 min (quick) / ~12 min (standard, 80 agents)** |
+
+Key optimizations over the base engine:
+- **Cached TWHIN-BERT** recommendation system — 15ms/round (down from 200s)
+- **Parallel NER** with 5 concurrent workers — graph build 5min down to 56s
+- **WAL mode** on SQLite for concurrent read performance
+
+## Quick Start
+
+### Prerequisites
+
+| Tool | Version | Check |
+|------|---------|-------|
+| **Python** | 3.11 – 3.12 | `python --version` |
+| **Node.js** | 18+ | `node -v` |
+| **uv** | Latest | `uv --version` |
+
+### 1. Configure
+
+```bash
+cp .env.example .env
+```
+
+Required environment variables:
 
 ```env
-# LLM API Configuration (supports any LLM API with OpenAI SDK format)
-# Recommended: Alibaba Qwen-plus model via Bailian Platform: https://bailian.console.aliyun.com/
-# High consumption, try simulations with fewer than 40 rounds first
-LLM_API_KEY=your_api_key
-LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-LLM_MODEL_NAME=qwen-plus
+# LLM — any OpenAI-compatible API
+LLM_API_KEY=your_key
+LLM_BASE_URL=https://api.openai.com/v1
+LLM_MODEL_NAME=gpt-4o
 
-# Zep Cloud Configuration
-# Free monthly quota is sufficient for simple usage: https://app.getzep.com/
-ZEP_API_KEY=your_zep_api_key
+# Database
+SURREALDB_URL=ws://localhost:8000/rpc
+SURREALDB_USER=root
+SURREALDB_PASS=root
 ```
 
-#### 2. Install Dependencies
+### 2. Install
 
 ```bash
-# One-click installation of all dependencies (root + frontend + backend)
 npm run setup:all
 ```
 
-Or install step by step:
+Or step by step:
 
 ```bash
-# Install Node dependencies (root + frontend)
-npm run setup
-
-# Install Python dependencies (backend, auto-creates virtual environment)
-npm run setup:backend
+npm run setup           # Node dependencies (root + frontend)
+npm run setup:backend   # Python dependencies (auto-creates venv)
 ```
 
-#### 3. Start Services
+### 3. Run
 
 ```bash
-# Start both frontend and backend (run from project root)
 npm run dev
 ```
 
-**Service URLs:**
-- Frontend: `http://localhost:3000`
-- Backend API: `http://localhost:5001`
+| Service | URL |
+|---------|-----|
+| Frontend | `http://localhost:3000` |
+| Backend API | `http://localhost:5001` |
 
-**Start Individually:**
-
-```bash
-npm run backend   # Start backend only
-npm run frontend  # Start frontend only
-```
-
-### Option 2: Docker Deployment
+### Docker Deployment
 
 ```bash
-# 1. Configure environment variables (same as source deployment)
-cp .env.example .env
-
-# 2. Pull image and start
+cp .env.example .env    # configure your keys
 docker compose up -d
 ```
 
-Reads `.env` from root directory by default, maps ports `3000 (frontend) / 5001 (backend)`
+## Architecture
 
-> Mirror address for faster pulling is provided as comments in `docker-compose.yml`, replace if needed.
+```
+deepmiro-engine/
+├── backend/                 # Python Flask API
+│   ├── app/
+│   │   ├── api/            # REST endpoints (simulation, graph, documents, report)
+│   │   ├── services/       # Core logic (graph builder, simulation runner, report agent)
+│   │   ├── storage/        # SurrealDB adapter, embedding service, NER
+│   │   └── utils/          # LLM client, retry logic, logging
+│   └── pyproject.toml
+├── frontend/                # Vue 3 + Vite
+│   ├── src/
+│   │   ├── components/     # 5-step workflow UI
+│   │   ├── views/          # Home, Simulation, Report, Interaction
+│   │   └── api/            # API client
+│   └── vite.config.js
+├── locales/                 # i18n (en, zh)
+├── docker-compose.yml
+└── Dockerfile
+```
 
-## 📬 Join the Conversation
+## Use Cases
+
+| Domain | Example |
+|--------|---------|
+| **Market analysis** | Upload an earnings report. Ask: "How will retail investors react to this guidance revision?" |
+| **Policy testing** | Upload a draft regulation. Ask: "What public backlash should we expect, and from which demographics?" |
+| **PR & comms** | Upload a press release. Ask: "How will this announcement play on social media over 48 hours?" |
+| **Competitive analysis** | Upload competitor product specs. Ask: "How will our user base respond to this feature gap?" |
+| **Creative exploration** | Upload a novel's first 80 chapters. Ask: "What ending would emerge from these character dynamics?" |
+| **Crisis simulation** | Upload an incident report. Ask: "How does public opinion evolve if we respond with X vs Y?" |
+
+## Acknowledgments
+
+DeepMiro Engine is a fork of [MiroFish](https://github.com/666ghj/MiroFish), originally created by Guo Hangjiang and supported by Shanda Group. The simulation layer is powered by [OASIS](https://github.com/camel-ai/oasis) from the CAMEL-AI team.
+
+## License
+
+[AGPL-3.0](./LICENSE)
+
+---
 
 <div align="center">
-<img src="./static/image/QQ群.png" alt="QQ Group" width="60%"/>
+
+**[deepmiro.org](https://deepmiro.org)**
+
 </div>
-
-&nbsp;
-
-The MiroFish team is recruiting full-time/internship positions. If you're interested in multi-agent simulation and LLM applications, feel free to send your resume to: **mirofish@shanda.com**
-
-## 📄 Acknowledgments
-
-**MiroFish has received strategic support and incubation from Shanda Group!**
-
-MiroFish's simulation engine is powered by **[OASIS (Open Agent Social Interaction Simulations)](https://github.com/camel-ai/oasis)**, We sincerely thank the CAMEL-AI team for their open-source contributions!
-
-## 📈 Project Statistics
-
-<a href="https://www.star-history.com/#666ghj/MiroFish&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=666ghj/MiroFish&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=666ghj/MiroFish&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=666ghj/MiroFish&type=date&legend=top-left" />
- </picture>
-</a>
