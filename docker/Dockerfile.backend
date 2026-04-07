@@ -11,8 +11,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
 
-# Copy engine source from monorepo
+# Copy engine source + shared assets from monorepo
 COPY engine/ /app/deepmiro/engine/
+COPY locales/ /app/deepmiro/locales/
+COPY static/ /app/deepmiro/static/
 
 # Install Python deps
 WORKDIR /app/deepmiro/engine
