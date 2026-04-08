@@ -723,11 +723,14 @@ predicted future.
    - Each section must call tools at least 3 times (maximum 5) to observe the \
 simulated world, which represents the future
 
-2. [Must Quote Agents' Original Statements and Actions]
-   - Agent statements and actions are predictions of future population behavior
-   - Use quote formatting in the report to display these predictions, for example:
-     > "A certain group would say: original text..."
-   - These quotes are the core evidence of simulation predictions
+2. [Must Quote Agents VERBATIM — No Paraphrasing]
+   - Agent statements from tool results must be quoted EXACTLY as-is
+   - NEVER reword, summarize, or paraphrase agent quotes
+   - Format: > "exact quote from tool result" — AgentName (Platform)
+   - Each section must contain at least 3 direct verbatim quotes
+   - WRONG: The agent felt the situation was serious
+   - RIGHT: > "This is way too serious, the school needs to respond" — Agent3 (Reddit)
+   - These verbatim quotes are the core evidence of simulation predictions
 
 3. [Language Consistency -- Quoted Content Must Be Translated to Report Language]
    - Tool-returned content may contain expressions in a language different from \
@@ -900,6 +903,9 @@ Tools called {tool_calls_count}/{max_tool_calls} times (used: {used_tools_str})\
 - If information is sufficient: output section content starting with \
 "Final Answer:" (must quote the above original text)
 - If more information is needed: call a tool to continue retrieval
+
+[Reminder] The original text above MUST be quoted VERBATIM in the report. \
+Do not paraphrase or reword any agent quotes. Use the exact words returned by the tool.
 ==============================================================="""
 
 REACT_INSUFFICIENT_TOOLS_MSG = (

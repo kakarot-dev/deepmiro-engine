@@ -503,13 +503,17 @@ export class MirofishClient {
   // ------------------------------------------------------------------
 
   private async get<T>(path: string, params?: Record<string, unknown>): Promise<MirofishApiResponse<T>> {
-    const resp = await this.http.get(path, { params });
-    return this.unwrap<T>(resp.data);
+    return withRetry(async () => {
+      const resp = await this.http.get(path, { params });
+      return this.unwrap<T>(resp.data);
+    }, this.maxRetries);
   }
 
   private async post<T>(path: string, body?: Record<string, unknown>): Promise<MirofishApiResponse<T>> {
-    const resp = await this.http.post(path, body);
-    return this.unwrap<T>(resp.data);
+    return withRetry(async () => {
+      const resp = await this.http.post(path, body);
+      return this.unwrap<T>(resp.data);
+    }, this.maxRetries);
   }
 
   private unwrap<T>(raw: unknown): MirofishApiResponse<T> {

@@ -1200,11 +1200,16 @@ class SimulationRunner:
             清理结果信息
         """
         import shutil
-        
+        from .simulation_file_manager import SimulationFileManager
+
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
-        
+
         if not os.path.exists(sim_dir):
-            return {"success": True, "message": "模拟目录不存在，无需清理"}
+            return {"success": True, "message": "Simulation directory does not exist"}
+
+        # Lifecycle guard: don't delete files while a report is generating
+        if SimulationFileManager.is_report_generating(simulation_id):
+            return {"success": False, "message": "Cannot clean up: report is currently being generated"}
         
         cleaned_files = []
         errors = []
@@ -1511,58 +1516,152 @@ class SimulationRunner:
         timeout: float = 60.0
     ) -> Dict[str, Any]:
         """
-        采访单个Agent
+        Interview a single agent.
 
-        Args:
-            simulation_id: 模拟ID
-            agent_id: Agent ID
-            prompt: 采访问题
-            platform: 指定平台（可选）
-                - "twitter": 只采访Twitter平台
-                - "reddit": 只采访Reddit平台
-                - None: 双平台模拟时同时采访两个平台，返回整合结果
-            timeout: 超时时间（秒）
-
-        Returns:
-            采访结果字典
-
-        Raises:
-            ValueError: 模拟不存在或环境未运行
-            TimeoutError: 等待响应超时
+        Uses live IPC if the subprocess is running, otherwise reconstructs
+        the agent from persisted data (config, profiles, posts, actions)
+        and interviews via LLM. Transparent to callers — same interface
+        and return format either way.
         """
-        sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
-        if not os.path.exists(sim_dir):
-            raise ValueError(f"模拟不存在: {simulation_id}")
+        from .simulation_file_manager import SimulationFileManager
 
-        ipc_client = SimulationIPCClient(sim_dir)
+        fm = SimulationFileManager(simulation_id)
+        if not fm.exists():
+            raise ValueError(f"Simulation not found: {simulation_id}")
 
-        if not ipc_client.check_env_alive():
-            raise ValueError(f"模拟环境未运行或已关闭，无法执行Interview: {simulation_id}")
+        ipc_client = SimulationIPCClient(fm.sim_dir)
 
-        logger.info(f"发送Interview命令: simulation_id={simulation_id}, agent_id={agent_id}, platform={platform}")
-
-        response = ipc_client.send_interview(
-            agent_id=agent_id,
-            prompt=prompt,
-            platform=platform,
-            timeout=timeout
-        )
-
-        if response.status.value == "completed":
-            return {
-                "success": True,
-                "agent_id": agent_id,
-                "prompt": prompt,
-                "result": response.result,
-                "timestamp": response.timestamp
-            }
-        else:
+        # Live IPC path — subprocess is running
+        if ipc_client.check_env_alive():
+            logger.info("Interview via IPC: sim=%s agent=%s platform=%s", simulation_id, agent_id, platform)
+            response = ipc_client.send_interview(
+                agent_id=agent_id,
+                prompt=prompt,
+                platform=platform,
+                timeout=timeout
+            )
+            if response.status.value == "completed":
+                return {
+                    "success": True,
+                    "agent_id": agent_id,
+                    "prompt": prompt,
+                    "result": response.result,
+                    "timestamp": response.timestamp
+                }
             return {
                 "success": False,
                 "agent_id": agent_id,
                 "prompt": prompt,
                 "error": response.error,
                 "timestamp": response.timestamp
+            }
+
+        # Subprocess gone — reconstruct agent and interview via LLM
+        logger.info("Interview via reconstruction: sim=%s agent=%s", simulation_id, agent_id)
+        return cls._reconstructed_interview(fm, agent_id, prompt, platform)
+
+    @classmethod
+    def _reconstructed_interview(
+        cls,
+        fm,  # SimulationFileManager
+        agent_id: int,
+        prompt: str,
+        platform: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Reconstruct agent context from persisted data and interview via LLM."""
+        from ..utils.llm_client import LLMClient
+        from datetime import datetime
+
+        # 1. Load agent persona from config
+        config = fm.read_config() or {}
+        agent_config = {}
+        for ac in config.get("agent_configs", []):
+            if ac.get("agent_id") == agent_id:
+                agent_config = ac
+                break
+
+        # 2. Load richer profile
+        profiles = fm.read_profiles("reddit") or fm.read_profiles("twitter")
+        agent_profile = profiles[agent_id] if agent_id < len(profiles) else {}
+
+        # 3. Load posts from SQLite
+        posts = fm.query_agent_posts(agent_id, platform)
+        post_texts = []
+        for p in posts[:20]:
+            content = p.get("content", "")
+            if content:
+                post_texts.append(f"- {content}")
+
+        # 4. Load action history from JSONL
+        actions = fm.read_all_actions(agent_id=agent_id)[-30:]
+        action_lines = []
+        for a in actions:
+            atype = a.get("action_type", "")
+            args = a.get("action_args", {})
+            content = args.get("content", "")
+            line = f"Round {a.get('round_num', '?')}: {atype}"
+            if content:
+                line += f' — "{content[:100]}"'
+            action_lines.append(line)
+
+        # 5. Load prior interview history
+        interviews = fm.query_interview_history(agent_id=agent_id)
+        interview_lines = []
+        for iv in interviews[:5]:
+            info = iv.get("info", {})
+            if isinstance(info, dict):
+                q = info.get("prompt", "")
+                a = info.get("response", "")
+                if q and a:
+                    interview_lines.append(f"Q: {q}\nA: {a}")
+
+        # Build persona description
+        name = agent_profile.get("realname") or agent_profile.get("name") or agent_config.get("name", f"Agent {agent_id}")
+        persona = agent_profile.get("persona") or agent_config.get("persona", "")
+        bio = agent_profile.get("bio") or agent_config.get("bio", "")
+
+        system_parts = [
+            f"You are {name}, a participant in a social media simulation.",
+        ]
+        if persona:
+            system_parts.append(f"Your personality: {persona}")
+        if bio:
+            system_parts.append(f"Your bio: {bio}")
+        if post_texts:
+            system_parts.append(f"Your posts during the simulation:\n" + "\n".join(post_texts))
+        if action_lines:
+            system_parts.append(f"Your actions during the simulation:\n" + "\n".join(action_lines))
+        if interview_lines:
+            system_parts.append(f"Your prior interview responses:\n" + "\n\n".join(interview_lines))
+        system_parts.append(
+            "Respond to the interview question in character. Be specific and reference your actual posts and actions from the simulation."
+        )
+
+        system_prompt = "\n\n".join(system_parts)
+
+        try:
+            llm = LLMClient()
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ]
+            response_text = llm.chat(messages)
+
+            return {
+                "success": True,
+                "agent_id": agent_id,
+                "prompt": prompt,
+                "result": {"response": response_text, "platform": platform or "reconstructed"},
+                "timestamp": datetime.now().isoformat(),
+            }
+        except Exception as exc:
+            logger.error("Reconstructed interview failed for agent %s: %s", agent_id, exc)
+            return {
+                "success": False,
+                "agent_id": agent_id,
+                "prompt": prompt,
+                "error": str(exc),
+                "timestamp": datetime.now().isoformat(),
             }
     
     @classmethod
@@ -1574,55 +1673,58 @@ class SimulationRunner:
         timeout: float = 120.0
     ) -> Dict[str, Any]:
         """
-        批量采访多个Agent
+        Batch interview multiple agents.
 
-        Args:
-            simulation_id: 模拟ID
-            interviews: 采访列表，每个元素包含 {"agent_id": int, "prompt": str, "platform": str(可选)}
-            platform: 默认平台（可选，会被每个采访项的platform覆盖）
-                - "twitter": 默认只采访Twitter平台
-                - "reddit": 默认只采访Reddit平台
-                - None: 双平台模拟时每个Agent同时采访两个平台
-            timeout: 超时时间（秒）
-
-        Returns:
-            批量采访结果字典
-
-        Raises:
-            ValueError: 模拟不存在或环境未运行
-            TimeoutError: 等待响应超时
+        Uses live IPC if subprocess is running, otherwise reconstructs
+        each agent individually. Transparent to callers.
         """
-        sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
-        if not os.path.exists(sim_dir):
-            raise ValueError(f"模拟不存在: {simulation_id}")
+        from .simulation_file_manager import SimulationFileManager
+        from datetime import datetime
 
-        ipc_client = SimulationIPCClient(sim_dir)
+        fm = SimulationFileManager(simulation_id)
+        if not fm.exists():
+            raise ValueError(f"Simulation not found: {simulation_id}")
 
-        if not ipc_client.check_env_alive():
-            raise ValueError(f"模拟环境未运行或已关闭，无法执行Interview: {simulation_id}")
+        ipc_client = SimulationIPCClient(fm.sim_dir)
 
-        logger.info(f"发送批量Interview命令: simulation_id={simulation_id}, count={len(interviews)}, platform={platform}")
-
-        response = ipc_client.send_batch_interview(
-            interviews=interviews,
-            platform=platform,
-            timeout=timeout
-        )
-
-        if response.status.value == "completed":
-            return {
-                "success": True,
-                "interviews_count": len(interviews),
-                "result": response.result,
-                "timestamp": response.timestamp
-            }
-        else:
+        # Live IPC path
+        if ipc_client.check_env_alive():
+            logger.info("Batch interview via IPC: sim=%s count=%s", simulation_id, len(interviews))
+            response = ipc_client.send_batch_interview(
+                interviews=interviews,
+                platform=platform,
+                timeout=timeout
+            )
+            if response.status.value == "completed":
+                return {
+                    "success": True,
+                    "interviews_count": len(interviews),
+                    "result": response.result,
+                    "timestamp": response.timestamp
+                }
             return {
                 "success": False,
                 "interviews_count": len(interviews),
                 "error": response.error,
                 "timestamp": response.timestamp
             }
+
+        # Subprocess gone — reconstruct each agent
+        logger.info("Batch interview via reconstruction: sim=%s count=%s", simulation_id, len(interviews))
+        results = {}
+        for iv in interviews:
+            agent_id = iv.get("agent_id")
+            iv_prompt = iv.get("prompt", "")
+            iv_platform = iv.get("platform") or platform
+            result = cls._reconstructed_interview(fm, agent_id, iv_prompt, iv_platform)
+            results[str(agent_id)] = result
+
+        return {
+            "success": True,
+            "interviews_count": len(interviews),
+            "result": results,
+            "timestamp": datetime.now().isoformat(),
+        }
     
     @classmethod
     def interview_all_agents(
@@ -1649,17 +1751,15 @@ class SimulationRunner:
         Returns:
             全局采访结果字典
         """
-        sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
-        if not os.path.exists(sim_dir):
-            raise ValueError(f"模拟不存在: {simulation_id}")
+        from .simulation_file_manager import SimulationFileManager
 
-        # 从配置文件获取所有Agent信息
-        config_path = os.path.join(sim_dir, "simulation_config.json")
-        if not os.path.exists(config_path):
-            raise ValueError(f"模拟配置不存在: {simulation_id}")
+        fm = SimulationFileManager(simulation_id)
+        if not fm.exists():
+            raise ValueError(f"Simulation not found: {simulation_id}")
 
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
+        config = fm.read_config()
+        if not config:
+            raise ValueError(f"Simulation config not found: {simulation_id}")
 
         agent_configs = config.get("agent_configs", [])
         if not agent_configs:
@@ -1702,19 +1802,21 @@ class SimulationRunner:
         Returns:
             操作结果字典
         """
-        sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
-        if not os.path.exists(sim_dir):
-            raise ValueError(f"模拟不存在: {simulation_id}")
-        
-        ipc_client = SimulationIPCClient(sim_dir)
-        
+        from .simulation_file_manager import SimulationFileManager
+
+        fm = SimulationFileManager(simulation_id)
+        if not fm.exists():
+            raise ValueError(f"Simulation not found: {simulation_id}")
+
+        ipc_client = SimulationIPCClient(fm.sim_dir)
+
         if not ipc_client.check_env_alive():
             return {
                 "success": True,
-                "message": "环境已经关闭"
+                "message": "Environment already stopped"
             }
-        
-        logger.info(f"发送关闭环境命令: simulation_id={simulation_id}")
+
+        logger.info("Sending close env command: sim=%s", simulation_id)
         
         try:
             response = ipc_client.send_close_env(timeout=timeout)

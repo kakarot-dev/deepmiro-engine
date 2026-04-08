@@ -87,6 +87,9 @@ function isTransientError(err: unknown): boolean {
     if (!status) return true;
     return status === 429 || status >= 500;
   }
+  if (err instanceof Error && /ECONNREFUSED|ECONNRESET|ETIMEDOUT/.test(err.message)) {
+    return true;
+  }
   return false;
 }
 

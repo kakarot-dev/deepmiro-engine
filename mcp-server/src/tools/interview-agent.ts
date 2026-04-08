@@ -4,6 +4,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { MirofishClient } from "../client/mirofish-client.js";
+import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { toMcpError } from "../errors/index.js";
 
 const inputSchema = {
@@ -30,6 +31,11 @@ export function registerInterviewAgent(server: McpServer, client: MirofishClient
     },
     async (args) => {
       try {
+        const healthy = await client.healthCheck();
+        if (!healthy) {
+          throw new McpError(ErrorCode.InternalError, "Backend unreachable. Try again shortly.");
+        }
+
         const result = await client.interviewAgent(
           args.simulation_id,
           args.agent_id,
