@@ -354,6 +354,57 @@ export class MirofishClient {
   }
 
   // ------------------------------------------------------------------
+  // Simulation data access
+  // ------------------------------------------------------------------
+
+  async getSimulationProfiles(simulationId: string): Promise<unknown[]> {
+    const resp = await this.get<unknown[]>(`/api/simulation/${simulationId}/profiles`);
+    return resp.data ?? [];
+  }
+
+  async getSimulationConfig(simulationId: string): Promise<Record<string, unknown>> {
+    const resp = await this.get<Record<string, unknown>>(`/api/simulation/${simulationId}/config`);
+    return resp.data ?? {};
+  }
+
+  async getSimulationActions(
+    simulationId: string,
+    params?: { platform?: string; agent_name?: string; action_type?: string; limit?: number },
+  ): Promise<unknown[]> {
+    const resp = await this.get<unknown[]>(`/api/simulation/${simulationId}/actions`, params);
+    return resp.data ?? [];
+  }
+
+  async getSimulationPosts(
+    simulationId: string,
+    params?: { platform?: string; limit?: number; offset?: number },
+  ): Promise<{ posts: unknown[]; total: number }> {
+    const resp = await this.get<{ posts: unknown[]; total: number }>(
+      `/api/simulation/${simulationId}/posts`,
+      params,
+    );
+    return resp.data ?? { posts: [], total: 0 };
+  }
+
+  async getSimulationTimeline(simulationId: string): Promise<unknown[]> {
+    const resp = await this.get<unknown[]>(`/api/simulation/${simulationId}/timeline`);
+    return resp.data ?? [];
+  }
+
+  async getAgentStats(simulationId: string): Promise<Record<string, unknown>> {
+    const resp = await this.get<Record<string, unknown>>(`/api/simulation/${simulationId}/agent-stats`);
+    return resp.data ?? {};
+  }
+
+  async getInterviewHistory(simulationId: string, agentId?: number): Promise<unknown[]> {
+    const resp = await this.post<unknown[]>("/api/simulation/interview/history", {
+      simulation_id: simulationId,
+      agent_id: agentId,
+    });
+    return resp.data ?? [];
+  }
+
+  // ------------------------------------------------------------------
   // Internal: lower-level API calls
   // ------------------------------------------------------------------
 

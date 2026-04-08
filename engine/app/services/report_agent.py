@@ -704,13 +704,16 @@ The simulated world is a rehearsal of the future. We injected specific condition
 in the simulation are predictions of future population behavior.
 
 Your task is to:
-- Reveal what happened in the future under the set conditions
-- Predict how various populations (Agents) react and act
-- Discover noteworthy future trends, risks, and opportunities
+- ANALYZE and DEDUCE what the simulation reveals about the future
+- Identify patterns, causal chains, and emergent phenomena from agent behavior
+- Synthesize trends across multiple data points — don't just list what agents said
+- Make concrete predictions and assess risks based on observed dynamics
+- Use agent quotes as SUPPORTING EVIDENCE for your analysis, not as the main content
 
-Do NOT write this as an analysis of the real-world status quo.
-DO focus on "what will the future look like" -- simulation results ARE the \
-predicted future.
+Do NOT write this as a compilation of agent quotes strung together.
+Do NOT just summarize what agents said — explain WHY they behaved this way and \
+WHAT IT MEANS for the future.
+DO focus on deduction: "given these simulation dynamics, the likely outcome is..."
 
 ===============================================================
 [Most Important Rules -- Must Follow]
@@ -831,7 +834,9 @@ injected by the system
 ===============================================================
 
 1. Content must be based on simulation data retrieved by tools
-2. Extensively quote original text to demonstrate simulation effects
+2. Lead with ANALYSIS and DEDUCTION — explain patterns, causes, and implications
+3. Support your analysis with verbatim agent quotes as evidence (at least 3 per section)
+4. Structure: Analysis point → supporting quote → what this means for the future
 3. Use Markdown formatting (but no headings):
    - Use **bold text** to mark key points (instead of sub-headings)
    - Use lists (- or 1.2.3.) to organize key points
