@@ -1,15 +1,20 @@
 {
   "name": "deepmiro-mcp",
   "version": "0.1.0",
-  "description": "DeepMiro — production-grade MCP server for MiroFish swarm simulations",
+  "description": "MCP server for DeepMiro — simulate hundreds of AI agents to predict outcomes from any document",
   "license": "AGPL-3.0-only",
   "type": "module",
+  "mcpName": "io.github.kakarot-dev/deepmiro",
   "bin": {
-    "deepmiro-mcp": "./dist/index.js"
+    "deepmiro-mcp": "dist/index.js"
   },
   "main": "./dist/index.js",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
+    "prepublishOnly": "npm run build",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "start:stdio": "TRANSPORT=stdio node dist/index.js",
@@ -17,6 +22,23 @@
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit"
   },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "ai-agents",
+    "swarm-intelligence",
+    "prediction",
+    "deepmiro",
+    "claude"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kakarot-dev/deepmiro.git",
+    "directory": "mcp-server"
+  },
+  "homepage": "https://deepmiro.org",
+  "author": "Joel Libni <joel@deepmiro.org> (https://github.com/kakarot-dev)",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "axios": "^1.7.0",
