@@ -1,6 +1,7 @@
 ---
+name: predict
 description: Run a DeepMiro swarm prediction — simulate how communities react to events. Use when user says "predict", "simulate", "how will people react", or "what would happen if".
-argument-hint: [scenario] [optional-file-path]
+argument-hint: "[scenario] [optional-file-path]"
 ---
 
 # DeepMiro Predict
