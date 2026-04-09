@@ -1,0 +1,21 @@
+{
+  "name": "deepmiro-marketplace",
+  "interface": {
+    "displayName": "DeepMiro"
+  },
+  "plugins": [
+    {
+      "name": "deepmiro",
+      "source": {
+        "source": "github",
+        "owner": "kakarot-dev",
+        "repo": "deepmiro"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Research"
+    }
+  ]
+}

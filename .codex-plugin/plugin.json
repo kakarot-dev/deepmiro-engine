@@ -1,0 +1,28 @@
+{
+  "name": "deepmiro",
+  "version": "0.1.0",
+  "description": "Swarm prediction engine — simulate hundreds of AI agents to predict how communities react to events, policies, and announcements.",
+  "author": {
+    "name": "kakarot-dev",
+    "url": "https://deepmiro.org"
+  },
+  "homepage": "https://deepmiro.org",
+  "repository": "https://github.com/kakarot-dev/deepmiro",
+  "license": "AGPL-3.0",
+  "keywords": ["prediction", "ai-agents", "swarm-intelligence", "mcp", "simulation"],
+  "skills": "./plugin/skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "DeepMiro",
+    "shortDescription": "Predict anything with AI agent swarms",
+    "longDescription": "Feed DeepMiro a document or scenario. It creates hundreds of AI personas — journalists, officials, critics, supporters — and lets them debate on simulated social platforms. You get back a prediction report and a living world you can interrogate agent by agent.",
+    "developerName": "Joel Libni",
+    "category": "Research",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://deepmiro.org",
+    "privacyPolicyURL": "https://deepmiro.org/legal/privacy",
+    "termsOfServiceURL": "https://deepmiro.org/legal/terms",
+    "defaultPrompt": ["predict how will people react to", "simulate what happens if"],
+    "brandColor": "#22d3ee"
+  }
+}
