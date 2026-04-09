@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "deepmiro",
-      "source": "./plugin",
+      "source": "./",
       "description": "Swarm prediction engine — simulate how communities react to events, policies, and announcements.",
       "version": "0.1.0",
       "author": {

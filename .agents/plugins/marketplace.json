@@ -7,9 +7,8 @@
     {
       "name": "deepmiro",
       "source": {
-        "source": "github",
-        "owner": "kakarot-dev",
-        "repo": "deepmiro"
+        "source": "local",
+        "path": "./"
       },
       "policy": {
         "installation": "AVAILABLE",
