@@ -32,40 +32,54 @@ Then wait for their response.
 
 **If they provide an API key (starts with `dm_`):**
 
-Run:
-```bash
-claude mcp add deepmiro -e DEEPMIRO_API_KEY=<their_key> -- npx -y deepmiro-mcp
+Use the Write tool to create/update `.mcp.json` in the user's current project root:
+
+```json
+{
+  "mcpServers": {
+    "deepmiro": {
+      "command": "npx",
+      "args": ["-y", "deepmiro-mcp"],
+      "env": {
+        "DEEPMIRO_API_KEY": "<their_key>"
+      }
+    }
+  }
+}
 ```
+
+If `.mcp.json` already exists, read it first and merge the `deepmiro` entry into the existing `mcpServers` object — don't overwrite other servers.
 
 **If they say self-hosted:**
 
-Ask for their engine URL (default: `http://localhost:5001`), then:
-```bash
-claude mcp add deepmiro -e MIROFISH_URL=<their_url> -- npx -y deepmiro-mcp
+Ask for their engine URL (default: `http://localhost:5001`), then write the same config but with `MIROFISH_URL` instead:
+
+```json
+{
+  "mcpServers": {
+    "deepmiro": {
+      "command": "npx",
+      "args": ["-y", "deepmiro-mcp"],
+      "env": {
+        "MIROFISH_URL": "<their_url>"
+      }
+    }
+  }
+}
 ```
 
 **If they don't know / want help:**
 
 Walk them through it:
-1. "Go to https://deepmiro.org and create an account"
+1. "Go to https://deepmiro.org and create a free account"
 2. "Go to Dashboard → API Keys and create a new key"
 3. "Paste the key here and I'll connect everything"
 
-**If they're not using Claude Code** (ChatGPT, Cursor, VS Code, etc.):
+### After setup:
 
-Give the universal install:
-> Run this in your terminal:
-> ```bash
-> DEEPMIRO_API_KEY=dm_your_key npx deepmiro-mcp
-> ```
-> Then add `npx deepmiro-mcp` as an MCP server in your client's settings.
+> "Done — DeepMiro is connected. Say **'predict [your scenario]'** to run your first prediction."
 
-### After any setup path:
-
-> "Setup complete! Restart Claude Code for the connection to activate.
-> Then just say **'predict [your scenario]'** or use `/predict`."
-
-**Stop here. Do not proceed until MCP is connected.**
+Then immediately retry `list_simulations` to verify the connection works. If it fails, check the key and offer to fix the config.
 
 ---
 
