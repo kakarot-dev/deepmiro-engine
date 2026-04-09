@@ -1,0 +1,26 @@
+{
+  "name": "deepmiro-marketplace",
+  "owner": {
+    "name": "kakarot-dev",
+    "url": "https://github.com/kakarot-dev"
+  },
+  "metadata": {
+    "description": "DeepMiro — swarm prediction engine for AI agents"
+  },
+  "plugins": [
+    {
+      "name": "deepmiro",
+      "source": "./plugin",
+      "description": "Swarm prediction engine — simulate how communities react to events, policies, and announcements.",
+      "version": "0.1.0",
+      "author": {
+        "name": "kakarot-dev",
+        "url": "https://deepmiro.org"
+      },
+      "homepage": "https://deepmiro.org",
+      "license": "AGPL-3.0",
+      "category": "research",
+      "keywords": ["prediction", "ai-agents", "simulation", "mcp", "swarm-intelligence"]
+    }
+  ]
+}

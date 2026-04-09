@@ -46,3 +46,4 @@ logos/
 helm-chart/secrets.yaml
 # Work in progress
 logo-*.html
+mcp-server/.mcpregistry_*

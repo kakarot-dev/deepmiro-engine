@@ -7,5 +7,15 @@
     "url": "https://deepmiro.org"
   },
   "homepage": "https://github.com/kakarot-dev/deepmiro",
-  "license": "AGPL-3.0"
+  "license": "AGPL-3.0",
+  "skills": ["./skills/predict"],
+  "mcpServers": {
+    "deepmiro": {
+      "command": "npx",
+      "args": ["-y", "deepmiro-mcp"],
+      "env": {
+        "DEEPMIRO_API_KEY": "${DEEPMIRO_API_KEY}"
+      }
+    }
+  }
 }
