@@ -60,11 +60,10 @@ export DEEPMIRO_API_KEY=dm_your_key   # or set it in ~/.claude/settings.json
 
 Then restart Claude Code and say `/predict` or `predict how people will react to [scenario]`.
 
-**Any other MCP client** — install the MCP server directly:
+**Other clients:**
 
 | Client | Install |
 |--------|---------|
-| **Claude Code (MCP only)** | `claude mcp add deepmiro -e DEEPMIRO_API_KEY=dm_xxx -- npx -y deepmiro-mcp` |
 | **OpenAI Codex** | `codex plugin install kakarot-dev/deepmiro` |
 | **Claude Desktop** | Add to `claude_desktop_config.json`: `"deepmiro": {"command": "npx", "args": ["-y", "deepmiro-mcp"], "env": {"DEEPMIRO_API_KEY": "dm_xxx"}}` |
 | **ChatGPT Desktop** | Settings → MCP Servers → Add → `npx deepmiro-mcp` with env `DEEPMIRO_API_KEY` |
