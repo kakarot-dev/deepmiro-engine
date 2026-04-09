@@ -33,7 +33,7 @@ Then wait for their response.
 
 **If they provide an API key (starts with `dm_`):**
 
-Use the Write tool to create/update `.mcp.json` in the user's current project root:
+Use the Write tool to create/update `.mcp.json` in the user's current project root. This is the fastest path — connects immediately, no restart needed:
 
 ```json
 {
@@ -50,6 +50,17 @@ Use the Write tool to create/update `.mcp.json` in the user's current project ro
 ```
 
 If `.mcp.json` already exists, read it first and merge the `deepmiro` entry into the existing `mcpServers` object — don't overwrite other servers.
+
+**Alternative — install the full plugin (persistent across all projects):**
+
+If the user asks for a more permanent install, tell them:
+> Run this once and DeepMiro will be available in every project:
+> ```bash
+> claude plugin marketplace add kakarot-dev/deepmiro
+> claude plugin install deepmiro@deepmiro-marketplace
+> export DEEPMIRO_API_KEY=dm_your_key   # add to ~/.zshrc or ~/.bashrc
+> ```
+> Then restart Claude Code.
 
 **If they say self-hosted:**
 
@@ -68,6 +79,8 @@ Ask for their engine URL (default: `http://localhost:5001`), then write the same
   }
 }
 ```
+
+Self-hosters don't need an API key.
 
 **If they don't know / want help:**
 
