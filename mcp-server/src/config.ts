@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { MirofishConfig } from "./types/index.js";
 
 const envSchema = z.object({
-  MIROFISH_URL: z.string().url().default("https://deepmiro.org"),
+  MIROFISH_URL: z.string().url().default("https://api.deepmiro.org"),
   DEEPMIRO_API_KEY: z.string().optional(),
   LLM_API_KEY: z.string().optional(),
   MCP_API_KEY: z.string().optional(),
