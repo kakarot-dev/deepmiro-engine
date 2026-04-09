@@ -46,7 +46,10 @@ async function resolveStatus(
   client: MirofishClient,
   simulationId: string,
   detailed: boolean,
+  originalId?: string,
 ): Promise<RichSimulationStatus> {
+  const pendingId = originalId ?? simulationId;
+
   // --- Handle pending_* IDs (pipeline still in early stages) ---
   if (simulationId.startsWith("pending_")) {
     return resolvePendingStatus(client, simulationId);
@@ -64,7 +67,7 @@ async function resolveStatus(
   }
 
   if (sim.status === "completed") {
-    return resolveCompletedStatus(client, sim);
+    return resolveCompletedStatus(client, sim, pendingId);
   }
 
   if (sim.status === "failed") {
@@ -254,10 +257,34 @@ async function resolveRunningStatus(
 async function resolveCompletedStatus(
   client: MirofishClient,
   sim: { simulation_id: string; entities_count?: number },
+  originalId?: string,
 ): Promise<RichSimulationStatus> {
   let totalActions = 0;
   let totalRounds = 0;
   let reportAvailable = false;
+
+  // Check if pipeline is still generating the report
+  if (originalId?.startsWith("pending_")) {
+    const projectId = originalId.slice(8);
+    const tracker = client.pipelineTrackers.get(projectId);
+    if (tracker?.phase === "generating_report") {
+      try {
+        const runStatus = await client.getSimulationRunStatus(sim.simulation_id);
+        totalActions = runStatus.twitter_actions_count + runStatus.reddit_actions_count;
+        totalRounds = runStatus.total_rounds;
+      } catch { /* ignore */ }
+      return {
+        simulation_id: sim.simulation_id,
+        phase: "generating_report",
+        phase_display: "Generating prediction report",
+        progress: 90,
+        entities_count: sim.entities_count,
+        total_actions: totalActions,
+        total_rounds: totalRounds > 0 ? totalRounds : undefined,
+        message: `Simulation complete (${totalActions} actions). Now generating the prediction report...`,
+      };
+    }
+  }
 
   try {
     const runStatus = await client.getSimulationRunStatus(sim.simulation_id);
@@ -266,19 +293,21 @@ async function resolveCompletedStatus(
   } catch { /* run status may not be available */ }
 
   try {
-    const report = await client.getOrGenerateReport(sim.simulation_id);
-    reportAvailable = report.status === "completed";
-  } catch { /* report may not exist */ }
+    const resp = await client.getSimulationPosts(sim.simulation_id, { limit: 0 });
+    // Check if report exists without triggering generation
+    const reportResp = await (client as any).get(`/api/report/by-simulation/${sim.simulation_id}`).catch(() => null);
+    reportAvailable = reportResp?.data?.status === "completed";
+  } catch { /* ignore */ }
 
   return {
     simulation_id: sim.simulation_id,
     phase: "completed",
-    phase_display: "Simulation complete",
+    phase_display: "Prediction ready",
     progress: 100,
     entities_count: sim.entities_count,
     total_actions: totalActions,
     total_rounds: totalRounds > 0 ? totalRounds : undefined,
     report_available: reportAvailable,
-    message: `Simulation complete. ${sim.entities_count ?? "?"} personas generated ${totalActions} actions${totalRounds ? ` across ${totalRounds} rounds` : ""} on Twitter and Reddit.${reportAvailable ? " Report is ready — use get_report to view." : " Use get_report to generate the analysis."}`,
+    message: `Prediction complete. ${sim.entities_count ?? "?"} agents generated ${totalActions} actions${totalRounds ? ` across ${totalRounds} rounds` : ""}.${reportAvailable ? " Report is ready — use get_report to view." : " Report is being generated..."}`,
   };
 }

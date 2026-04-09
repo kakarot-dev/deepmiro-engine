@@ -152,6 +152,7 @@ export type PipelinePhase =
   | "generating_profiles"
   | "simulating"
   | "generating_report"
+  | "generating_report"
   | "completed"
   | "failed";
 
@@ -194,6 +195,7 @@ export interface PipelineTracker {
   graphTaskId: string;
   simulationId?: string;
   prepareTaskId?: string;
+  reportId?: string;
   phase: PipelinePhase;
   error?: string;
 }

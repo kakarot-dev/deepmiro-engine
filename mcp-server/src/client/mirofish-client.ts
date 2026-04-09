@@ -171,6 +171,26 @@ export class MirofishClient {
       const maxRounds = params.rounds ?? this.resolveRounds(params.preset);
       const platform = params.platform === "both" || !params.platform ? "parallel" : params.platform;
       await this.startSimulation(simState.simulation_id, platform, maxRounds);
+
+      // Wait for simulation to complete, then auto-generate report
+      await this.pollSimulationUntilDone(simState.simulation_id);
+
+      if (tracker) tracker.phase = "generating_report";
+      try {
+        const genResp = await this.post<{ report_id: string; task_id: string }>("/api/report/generate", {
+          simulation_id: simState.simulation_id,
+        });
+        if (tracker && genResp.data?.report_id) {
+          tracker.reportId = genResp.data.report_id;
+        }
+        if (genResp.data?.task_id) {
+          await this.pollReportUntilDone(genResp.data.task_id, 600_000);
+        }
+        if (tracker) tracker.phase = "completed";
+      } catch (reportErr) {
+        // Report failure shouldn't fail the whole pipeline — sim data is still available
+        if (tracker) tracker.phase = "completed";
+      }
     } catch (err) {
       if (tracker) {
         tracker.phase = "failed";
@@ -338,10 +358,21 @@ export class MirofishClient {
     return resp.data;
   }
 
-  async getPrepareStatus(simulationId: string): Promise<PrepareStatusDetail> {
-    const resp = await this.post<PrepareStatusDetail>("/api/simulation/prepare/status", {
-      simulation_id: simulationId,
-    });
+  async getPrepareStatus(simulationId: string, taskId?: string): Promise<PrepareStatusDetail> {
+    const body: Record<string, unknown> = { simulation_id: simulationId };
+    if (taskId) body.task_id = taskId;
+
+    // If no taskId provided, try to find it from pipeline tracker
+    if (!taskId) {
+      for (const [, tracker] of this.pipelineTrackers) {
+        if (tracker.simulationId === simulationId && tracker.prepareTaskId) {
+          body.task_id = tracker.prepareTaskId;
+          break;
+        }
+      }
+    }
+
+    const resp = await this.post<PrepareStatusDetail>("/api/simulation/prepare/status", body);
     return resp.data ?? { status: "unknown", progress: 0 };
   }
 
@@ -517,6 +548,24 @@ export class MirofishClient {
       await new Promise((r) => setTimeout(r, 3000));
     }
     throw new MirofishBackendError(`Task ${taskId} timed out`, 504);
+  }
+
+  private async pollSimulationUntilDone(simulationId: string, timeoutMs = 1_800_000): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        const sim = await this.getSimulation(simulationId);
+        if (sim.status === "completed") return;
+        if (sim.status === "failed") {
+          throw new MirofishBackendError(`Simulation failed: ${sim.error ?? "unknown"}`, 500);
+        }
+      } catch (err) {
+        if (err instanceof MirofishBackendError) throw err;
+        // transient error — keep polling
+      }
+      await new Promise((r) => setTimeout(r, 5000));
+    }
+    throw new MirofishBackendError("Simulation timed out", 504);
   }
 
   private async pollPrepareUntilDone(taskId: string, timeoutMs = 600_000): Promise<void> {
