@@ -15,8 +15,8 @@ const inputSchema = {
     .enum(["quick", "standard", "deep"])
     .optional()
     .describe("Simulation preset: quick (10 agents, 20 rounds), standard (20/40), deep (50/72)"),
-  agent_count: z.number().int().min(2).max(500).optional().describe("Override agent count"),
-  rounds: z.number().int().min(1).max(100).optional().describe("Override simulation rounds"),
+  agent_count: z.coerce.number().int().min(2).max(500).optional().describe("Override agent count"),
+  rounds: z.coerce.number().int().min(1).max(100).optional().describe("Override simulation rounds"),
   platform: z
     .enum(["twitter", "reddit", "both"])
     .optional()

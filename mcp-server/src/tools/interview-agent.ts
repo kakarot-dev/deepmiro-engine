@@ -9,7 +9,7 @@ import { toMcpError } from "../errors/index.js";
 
 const inputSchema = {
   simulation_id: z.string().describe("The simulation ID"),
-  agent_id: z.number().int().min(0).describe("The agent's numeric ID within the simulation"),
+  agent_id: z.coerce.number().int().min(0).describe("The agent's numeric ID within the simulation"),
   message: z.string().min(1).describe("Question or prompt to send to the agent"),
   platform: z
     .enum(["twitter", "reddit"])

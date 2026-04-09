@@ -102,8 +102,8 @@ const inputSchema = {
     .describe("Filter by platform (for actions and posts)"),
   agent_name: z.string().optional().describe("Filter actions by agent name"),
   action_type: z.string().optional().describe("Filter actions by type (CREATE_POST, LIKE_POST, etc.)"),
-  limit: z.number().int().min(1).max(200).optional().describe("Max results per page (default 50)"),
-  offset: z.number().int().min(0).optional().describe("Offset for pagination (default 0)"),
+  limit: z.coerce.number().int().min(1).max(200).optional().describe("Max results per page (default 50)"),
+  offset: z.coerce.number().int().min(0).optional().describe("Offset for pagination (default 0)"),
 };
 
 export function registerSimulationData(server: McpServer, client: MirofishClient): void {

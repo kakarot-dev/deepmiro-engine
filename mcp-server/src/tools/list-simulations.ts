@@ -7,7 +7,7 @@ import type { MirofishClient } from "../client/mirofish-client.js";
 import { toMcpError } from "../errors/index.js";
 
 const inputSchema = {
-  limit: z.number().int().min(1).max(100).optional().describe("Max results to return (default 20)"),
+  limit: z.coerce.number().int().min(1).max(100).optional().describe("Max results to return (default 20)"),
 };
 
 export function registerListSimulations(server: McpServer, client: MirofishClient): void {
