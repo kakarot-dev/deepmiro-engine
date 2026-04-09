@@ -433,6 +433,11 @@ export class MirofishClient {
     return resp.data ?? {};
   }
 
+  async getGraphData(graphId: string): Promise<Record<string, unknown>> {
+    const resp = await this.get<Record<string, unknown>>(`/api/graph/data/${graphId}`);
+    return resp.data ?? {};
+  }
+
   async getInterviewHistory(simulationId: string, agentId?: number): Promise<unknown[]> {
     const resp = await this.post<unknown[]>("/api/simulation/interview/history", {
       simulation_id: simulationId,
