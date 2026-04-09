@@ -90,15 +90,21 @@ SURREALDB_PASS=root
 
 ## MCP Server
 
-DeepMiro ships with a built-in [Model Context Protocol](https://modelcontextprotocol.io) server, so Claude (or any MCP-compatible client) can run predictions directly.
+DeepMiro ships with a built-in [Model Context Protocol](https://modelcontextprotocol.io) server. MCP is the universal standard adopted by Claude, ChatGPT, Gemini, Cursor, VS Code, and every major AI client — build once, works everywhere.
 
 ```bash
-# Point at a local engine
-cd mcp-server && npm ci && npm run dev
-
-# Or point at the hosted API
-MIROFISH_URL=https://api.deepmiro.org npm run dev
+npx deepmiro-mcp
 ```
+
+**Connect to any MCP client:**
+
+| Client | Install |
+|--------|---------|
+| **Claude Code** | `claude mcp add deepmiro -- npx deepmiro-mcp` |
+| **Claude Desktop** | Add to `claude_desktop_config.json` → `"deepmiro": {"command": "npx", "args": ["deepmiro-mcp"]}` |
+| **ChatGPT Desktop** | Settings → MCP Servers → Add → `npx deepmiro-mcp` |
+| **Cursor / Windsurf** | Settings → MCP → Add server → `npx deepmiro-mcp` |
+| **VS Code (Copilot)** | Add to `.vscode/mcp.json` → `"deepmiro": {"command": "npx", "args": ["deepmiro-mcp"]}` |
 
 Available tools: `create_simulation`, `quick_predict`, `simulation_status`, `get_report`, `interview_agent`, `upload_document`, `list_simulations`, `search_simulations`.
 
