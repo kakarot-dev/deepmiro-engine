@@ -9,8 +9,8 @@
 Feed it a document. Describe a scenario. Watch hundreds of AI agents with distinct personalities, memories, and social instincts interact — and return with a prediction.
 
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=flat-square)](./LICENSE)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](#-docker-deployment)
-[![MCP](https://img.shields.io/badge/MCP-Compatible-22d3ee?style=flat-square)](#-mcp-server)
+[![npm](https://img.shields.io/npm/v/deepmiro-mcp?style=flat-square&label=npm&color=22d3ee)](https://www.npmjs.com/package/deepmiro-mcp)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](#self-host)
 [![Website](https://img.shields.io/badge/deepmiro.org-live-22d3ee?style=flat-square)](https://deepmiro.org)
 
 </div>
@@ -44,37 +44,33 @@ Document ──► Entity Extraction ──► Agent Generation ──► Dual-P
 
 ## Quick Start
 
-### Option 1: Use the hosted service
+### Hosted (recommended)
 
-No setup required. Use via [Claude Code](https://claude.ai/claude-code) or the REST API:
+Get a free API key at [deepmiro.org](https://deepmiro.org), then connect from any AI client:
 
-```bash
-# Install the MCP plugin for Claude Code
-claude mcp add deepmiro -- npx -y @anthropic-ai/mcp-remote https://api.deepmiro.org/mcp
-```
+| Client | Install |
+|--------|---------|
+| **Claude Code** | `claude mcp add deepmiro -e DEEPMIRO_API_KEY=dm_xxx -- npx -y deepmiro-mcp` |
+| **OpenAI Codex** | `codex plugin install kakarot-dev/deepmiro` |
+| **Claude Desktop** | Add to `claude_desktop_config.json`: `"deepmiro": {"command": "npx", "args": ["-y", "deepmiro-mcp"], "env": {"DEEPMIRO_API_KEY": "dm_xxx"}}` |
+| **ChatGPT Desktop** | Settings → MCP Servers → Add → `npx deepmiro-mcp` with env `DEEPMIRO_API_KEY` |
+| **Cursor / Windsurf** | Settings → MCP → Add → `npx deepmiro-mcp` with env `DEEPMIRO_API_KEY` |
+| **VS Code (Copilot)** | Add to `.vscode/mcp.json`: `"deepmiro": {"command": "npx", "args": ["-y", "deepmiro-mcp"], "env": {"DEEPMIRO_API_KEY": "dm_xxx"}}` |
 
-3 free predictions/month at [deepmiro.org](https://deepmiro.org).
+Or just say "predict" in Claude Code or Codex — the built-in skill will walk you through setup.
 
-### Option 2: Self-host with Docker
+### Self-host
+
+No API key needed. Run the engine locally and point the MCP server at it:
 
 ```bash
 git clone https://github.com/kakarot-dev/deepmiro.git
 cd deepmiro
-cp .env.example .env   # add your LLM API key
+cp .env.example .env    # add your LLM API key
 docker compose -f docker/docker-compose.yml up -d
-```
 
-### Option 3: Run locally
-
-Prerequisites: Python 3.11–3.12, Node.js 18+, [uv](https://docs.astral.sh/uv/)
-
-```bash
-git clone https://github.com/kakarot-dev/deepmiro.git
-cd deepmiro
-cp .env.example .env   # add your LLM API key
-
-npm run setup:all      # install engine + MCP server deps
-npm run dev            # start engine on :5001
+# Connect your AI client to the local engine
+claude mcp add deepmiro -e MIROFISH_URL=http://localhost:5001 -- npx -y deepmiro-mcp
 ```
 
 ```env
@@ -90,21 +86,11 @@ SURREALDB_PASS=root
 
 ## MCP Server
 
-DeepMiro ships with a built-in [Model Context Protocol](https://modelcontextprotocol.io) server. MCP is the universal standard adopted by Claude, ChatGPT, Gemini, Cursor, VS Code, and every major AI client — build once, works everywhere.
+DeepMiro is an [MCP](https://modelcontextprotocol.io) server. MCP is the universal standard adopted by Claude, ChatGPT, Gemini, Cursor, VS Code, and every major AI client — one server, works everywhere.
 
 ```bash
 npx deepmiro-mcp
 ```
-
-**Connect to any MCP client:**
-
-| Client | Install |
-|--------|---------|
-| **Claude Code** | `claude mcp add deepmiro -- npx deepmiro-mcp` |
-| **Claude Desktop** | Add to `claude_desktop_config.json` → `"deepmiro": {"command": "npx", "args": ["deepmiro-mcp"]}` |
-| **ChatGPT Desktop** | Settings → MCP Servers → Add → `npx deepmiro-mcp` |
-| **Cursor / Windsurf** | Settings → MCP → Add server → `npx deepmiro-mcp` |
-| **VS Code (Copilot)** | Add to `.vscode/mcp.json` → `"deepmiro": {"command": "npx", "args": ["deepmiro-mcp"]}` |
 
 Available tools: `create_simulation`, `quick_predict`, `simulation_status`, `get_report`, `interview_agent`, `upload_document`, `list_simulations`, `search_simulations`.
 
@@ -148,9 +134,14 @@ deepmiro/
 │   │   ├── storage/     # SurrealDB adapter, embedding service, NER
 │   │   └── utils/       # LLM client, retry logic, logging
 │   └── pyproject.toml
-├── mcp-server/          # TypeScript MCP server
+├── mcp-server/          # TypeScript MCP server (npm: deepmiro-mcp)
 │   └── src/
-├── plugin/              # Claude Code plugin manifest
+├── plugin/              # Agent configs — works with all AI clients
+│   ├── .claude-plugin/  # Claude Code manifest
+│   ├── .codex-plugin/   # OpenAI Codex manifest
+│   ├── .agents/         # Marketplace catalog
+│   ├── .mcp.json        # Universal MCP server config
+│   └── skills/predict/  # /predict skill (auto-setup, narration, interviews)
 ├── helm-chart/          # Kubernetes (k3s) deployment
 ├── docker/              # Dockerfiles + compose
 ├── docs/                # Landing page
