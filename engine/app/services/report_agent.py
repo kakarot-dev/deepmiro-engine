@@ -861,7 +861,12 @@ fast-changing social media environment."
    The school's response was considered lacking in substance. > "The school's \
 response pattern..." This assessment reflects...
    ```
-5. Maintain logical coherence with other sections
+5. [Agent Names — Use Display Names, Not Internal IDs]
+   When quoting agents, convert internal usernames (e.g., "characterai_963",
+   "public_citizen_158", "sam_altman_402") to their proper display names
+   (e.g., "Character.AI", "Public Citizen", "Sam Altman").
+   Drop any trailing numeric suffixes from agent names.
+6. Maintain logical coherence with other sections
 6. [Avoid Repetition] Carefully read the completed sections below; do not repeat \
 the same information
 7. [Emphasis] Do not add any headings! Use **bold text** instead of sub-headings"""
@@ -992,7 +997,7 @@ class ReportAgent:
     """
     
     # 最大工具调用次数（每个章节）
-    MAX_TOOL_CALLS_PER_SECTION = 5
+    MAX_TOOL_CALLS_PER_SECTION = 7
     
     # 最大反思轮数
     MAX_REFLECTION_ROUNDS = 3
@@ -1581,6 +1586,8 @@ class ReportAgent:
 
                 # 正常结束
                 final_answer = response.split("Final Answer:")[-1].strip()
+                # Strip any leaked tool call markup from the final answer
+                final_answer = re.sub(r'<tool_call>.*?</tool_call>', '', final_answer, flags=re.DOTALL).strip()
                 logger.info(t('report.sectionGenDone', title=section.title, count=tool_calls_count))
 
                 if self.report_logger:
@@ -1679,7 +1686,7 @@ class ReportAgent:
             # 工具调用已足够，LLM 输出了内容但没带 "Final Answer:" 前缀
             # 直接将这段内容作为最终答案，不再空转
             logger.info(t('report.sectionNoPrefix', title=section.title, count=tool_calls_count))
-            final_answer = response.strip()
+            final_answer = re.sub(r'<tool_call>.*?</tool_call>', '', response, flags=re.DOTALL).strip()
 
             if self.report_logger:
                 self.report_logger.log_section_content(
@@ -1708,6 +1715,10 @@ class ReportAgent:
             final_answer = response.split("Final Answer:")[-1].strip()
         else:
             final_answer = response
+
+        # Strip any leaked tool call markup
+        if final_answer:
+            final_answer = re.sub(r'<tool_call>.*?</tool_call>', '', final_answer, flags=re.DOTALL).strip()
         
         # 记录章节内容生成完成日志
         if self.report_logger:
