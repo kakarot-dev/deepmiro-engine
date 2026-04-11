@@ -9,7 +9,7 @@ import { toMcpError } from "../errors/index.js";
 
 const inputSchema = {
   simulation_id: z.string().describe("The simulation ID returned by create_simulation"),
-  detailed: z.boolean().optional().describe("Include recent agent actions with content in the response"),
+  detailed: z.coerce.boolean().optional().describe("Include recent agent actions with content in the response"),
 };
 
 /** Extract content from action_args for content-producing actions */
