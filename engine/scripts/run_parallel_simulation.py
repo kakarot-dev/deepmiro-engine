@@ -1153,7 +1153,13 @@ async def run_twitter_simulation(
         model=model,
         available_actions=TWITTER_ACTIONS,
     )
-    
+
+    # Patch Twitter agents: enforce English
+    _lang_suffix_tw = "\n\n# LANGUAGE\nYou MUST write ALL posts and responses in English only. Never use Chinese or any other language."
+    for _aid, _agent in result.agent_graph.get_agents():
+        if hasattr(_agent, 'system_message') and hasattr(_agent.system_message, 'content'):
+            _agent.system_message.content += _lang_suffix_tw
+
     # 从配置文件获取 Agent 真实名称映射（使用 entity_name 而非默认的 Agent_X）
     agent_names = get_agent_names_from_config(config)
     # 如果配置中没有某个 agent，则使用 OASIS 的默认名称
@@ -1393,7 +1399,8 @@ async def run_reddit_simulation(
         available_actions=REDDIT_ACTIONS,
     )
 
-    # Optimize Reddit agents: reduce output tokens for non-content actions
+    # Patch Reddit agents: enforce English + reduce output tokens
+    _lang_suffix = "\n\n# LANGUAGE\nYou MUST write ALL posts, comments, and responses in English only. Never use Chinese or any other language."
     _concise_suffix = (
         "\n\n# OUTPUT EFFICIENCY\n"
         "When choosing non-content actions (DO_NOTHING, SEARCH_POSTS, SEARCH_USER, "
@@ -1403,9 +1410,9 @@ async def run_reddit_simulation(
     _patched = 0
     for _aid, _agent in result.agent_graph.get_agents():
         if hasattr(_agent, 'system_message') and hasattr(_agent.system_message, 'content'):
-            _agent.system_message.content += _concise_suffix
+            _agent.system_message.content += _lang_suffix + _concise_suffix
             _patched += 1
-    log_info(f"Patched {_patched} agents with concise output instruction")
+    log_info(f"Patched {_patched} agents with English + concise output instruction")
 
     # 从配置文件获取 Agent 真实名称映射（使用 entity_name 而非默认的 Agent_X）
     agent_names = get_agent_names_from_config(config)
