@@ -398,8 +398,9 @@ export class MirofishClient {
   // ------------------------------------------------------------------
 
   async getSimulationProfiles(simulationId: string): Promise<unknown[]> {
-    const resp = await this.get<unknown[]>(`/api/simulation/${simulationId}/profiles`);
-    return resp.data ?? [];
+    const resp = await this.get<any>(`/api/simulation/${simulationId}/profiles`);
+    const d = resp.data;
+    return Array.isArray(d) ? d : (d?.profiles ?? []);
   }
 
   async getSimulationConfig(simulationId: string): Promise<Record<string, unknown>> {
@@ -411,29 +412,31 @@ export class MirofishClient {
     simulationId: string,
     params?: { platform?: string; agent_name?: string; action_type?: string; limit?: number },
   ): Promise<unknown[]> {
-    const resp = await this.get<unknown[]>(`/api/simulation/${simulationId}/actions`, params);
-    return resp.data ?? [];
+    const resp = await this.get<any>(`/api/simulation/${simulationId}/actions`, params);
+    const d = resp.data;
+    // Backend wraps in { actions: [...] } or returns array directly
+    return Array.isArray(d) ? d : (d?.actions ?? []);
   }
 
   async getSimulationPosts(
     simulationId: string,
     params?: { platform?: string; limit?: number; offset?: number },
   ): Promise<{ posts: unknown[]; total: number }> {
-    const resp = await this.get<{ posts: unknown[]; total: number }>(
-      `/api/simulation/${simulationId}/posts`,
-      params,
-    );
-    return resp.data ?? { posts: [], total: 0 };
+    const resp = await this.get<any>(`/api/simulation/${simulationId}/posts`, params);
+    const d = resp.data;
+    return { posts: d?.posts ?? [], total: d?.total ?? d?.count ?? 0 };
   }
 
   async getSimulationTimeline(simulationId: string): Promise<unknown[]> {
-    const resp = await this.get<unknown[]>(`/api/simulation/${simulationId}/timeline`);
-    return resp.data ?? [];
+    const resp = await this.get<any>(`/api/simulation/${simulationId}/timeline`);
+    const d = resp.data;
+    return Array.isArray(d) ? d : (d?.timeline ?? []);
   }
 
   async getAgentStats(simulationId: string): Promise<Record<string, unknown>> {
-    const resp = await this.get<Record<string, unknown>>(`/api/simulation/${simulationId}/agent-stats`);
-    return resp.data ?? {};
+    const resp = await this.get<any>(`/api/simulation/${simulationId}/agent-stats`);
+    const d = resp.data;
+    return d?.stats ?? d ?? {};
   }
 
   async getGraphData(graphId: string): Promise<Record<string, unknown>> {
@@ -442,11 +445,12 @@ export class MirofishClient {
   }
 
   async getInterviewHistory(simulationId: string, agentId?: number): Promise<unknown[]> {
-    const resp = await this.post<unknown[]>("/api/simulation/interview/history", {
+    const resp = await this.post<any>("/api/simulation/interview/history", {
       simulation_id: simulationId,
       agent_id: agentId,
     });
-    return resp.data ?? [];
+    const d = resp.data;
+    return Array.isArray(d) ? d : (d?.interviews ?? d?.history ?? []);
   }
 
   // ------------------------------------------------------------------
