@@ -83,6 +83,42 @@ def generate_report():
                         "already_generated": True
                     }
                 })
+
+            # Dedupe in-flight generation: if a report exists in a non-terminal
+            # state, find its running task via metadata match and return that
+            # task_id so the caller polls the existing work instead of
+            # spawning a duplicate background task (wasted LLM spend, races on
+            # the same report_id slot).
+            if existing_report and existing_report.status in (
+                ReportStatus.PENDING,
+                ReportStatus.PLANNING,
+                ReportStatus.GENERATING,
+            ):
+                task_manager = TaskManager()
+                existing_task_id = None
+                for t_dict in task_manager.list_tasks(task_type="report_generate"):
+                    meta = t_dict.get("metadata") or {}
+                    if (
+                        meta.get("simulation_id") == simulation_id
+                        and meta.get("report_id") == existing_report.report_id
+                        and t_dict.get("status") in (
+                            TaskStatus.PENDING.value,
+                            TaskStatus.PROCESSING.value,
+                        )
+                    ):
+                        existing_task_id = t_dict.get("task_id")
+                        break
+                return jsonify({
+                    "success": True,
+                    "data": {
+                        "simulation_id": simulation_id,
+                        "report_id": existing_report.report_id,
+                        "task_id": existing_task_id,
+                        "status": existing_report.status.value,
+                        "message": t('api.reportGenerateStarted'),
+                        "already_generated": False
+                    }
+                })
         
         # 获取项目信息
         project = ProjectManager.get_project(state.project_id)
