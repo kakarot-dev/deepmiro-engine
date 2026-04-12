@@ -18,7 +18,7 @@ export function registerGetReport(server: McpServer, client: MirofishClient): vo
       description:
         "Generate and retrieve the prediction report for a completed simulation. " +
         "If the report hasn't been generated yet, triggers generation (may take 1-3 minutes). " +
-        "Returns a detailed markdown analysis of the simulation results.",
+        "Returns a detailed markdown analysis ready to display as an artifact in the side panel.",
       inputSchema,
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
@@ -26,21 +26,59 @@ export function registerGetReport(server: McpServer, client: MirofishClient): vo
       try {
         const report = await client.getOrGenerateReport(args.simulation_id);
 
-        const result: Record<string, unknown> = {
-          report_id: report.report_id,
-          simulation_id: report.simulation_id,
-          status: report.status,
-        };
+        // Still generating or failed — return status only
+        if (report.status !== "completed" || !report.markdown_content) {
+          const statusMsg =
+            report.status === "generating"
+              ? "Report is still being generated. Call get_report again in a minute."
+              : `Report status: ${report.status}`;
 
-        if (report.markdown_content) {
-          result.report = report.markdown_content;
-        } else if (report.outline?.sections) {
-          result.report = report.outline.sections
-            .map((s) => `## ${s.title}\n\n${s.content}`)
-            .join("\n\n---\n\n");
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify(
+                  {
+                    report_id: report.report_id,
+                    simulation_id: report.simulation_id,
+                    status: report.status,
+                    message: statusMsg,
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
         }
 
-        return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+        // Extract summary from the report (first paragraph after title)
+        const firstBlockquote = report.markdown_content.match(/^>\s*(.+?)$/m);
+        const summary = firstBlockquote?.[1] ?? "Prediction report ready.";
+
+        // Return metadata + full markdown as separate content items.
+        // Claude Desktop and Claude Code will render the markdown block as an
+        // artifact in the side panel when the LLM reproduces it in its response.
+        const metadata = {
+          report_id: report.report_id,
+          simulation_id: report.simulation_id,
+          status: "completed",
+          summary,
+          display_instructions:
+            "The full prediction report is included below as markdown. " +
+            "Output the markdown directly to the user — Claude Desktop will render " +
+            "it as an artifact in the side panel. Do not summarize or truncate.",
+          markdown_content: report.markdown_content,
+        };
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(metadata, null, 2),
+            },
+          ],
+        };
       } catch (err) {
         throw toMcpError(err);
       }
