@@ -9,6 +9,7 @@ OASIS Agent Profile生成器
 """
 
 import json
+import os
 import random
 import time
 from typing import Dict, Any, List, Optional
@@ -29,49 +30,58 @@ logger = get_logger('mirofish.oasis_profile')
 
 @dataclass
 class OasisAgentProfile:
-    """OASIS Agent Profile数据结构"""
-    # 通用字段
+    """OASIS Agent Profile data structure"""
+    # Common fields
     user_id: int
     user_name: str
     name: str
     bio: str
     persona: str
-    
-    # 可选字段 - Reddit风格
+
+    # Reddit-style optional fields
     karma: int = 1000
-    
-    # 可选字段 - Twitter风格
+
+    # Twitter-style optional fields
     friend_count: int = 100
     follower_count: int = 150
     statuses_count: int = 500
-    
-    # 额外人设信息
+
+    # Demographics
     age: Optional[int] = None
     gender: Optional[str] = None
     mbti: Optional[str] = None
     country: Optional[str] = None
     profession: Optional[str] = None
     interested_topics: List[str] = field(default_factory=list)
-    
-    # 来源实体信息
+
+    # Source entity provenance
     source_entity_uuid: Optional[str] = None
     source_entity_type: Optional[str] = None
-    
+
+    # Structured persona fields for drift resistance.
+    # These get rebuilt into the system message on every round via PersonaPromptBuilder
+    # (see avm.py). Keep the prose persona as narrative body, but these are what
+    # actually hold the character across long simulations.
+    ideology_anchor: str = ""  # 2-5 word partisan tag e.g. "conservative populist"
+    core_beliefs: List[str] = field(default_factory=list)  # 3-5 first-person declaratives
+    verbal_tics: List[str] = field(default_factory=list)  # 3-5 literal catchphrases
+    never_say: List[str] = field(default_factory=list)  # 3-5 sentences agent would refuse
+    speaking_style: str = ""  # 1-2 sentences on register + rhetorical habits
+
     created_at: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
     
     def to_reddit_format(self) -> Dict[str, Any]:
-        """转换为Reddit平台格式"""
+        """Convert to Reddit platform format (persisted to reddit_profiles.json)."""
         profile = {
             "user_id": self.user_id,
-            "username": self.user_name,  # OASIS 库要求字段名为 username（无下划线）
+            "username": self.user_name,  # OASIS expects 'username' without underscore
             "name": self.name,
             "bio": self.bio,
             "persona": self.persona,
             "karma": self.karma,
             "created_at": self.created_at,
         }
-        
-        # 添加额外人设信息（如果有）
+
         if self.age:
             profile["age"] = self.age
         if self.gender:
@@ -84,8 +94,24 @@ class OasisAgentProfile:
             profile["profession"] = self.profession
         if self.interested_topics:
             profile["interested_topics"] = self.interested_topics
-        
+
         return profile
+
+    def to_persona_struct(self) -> Dict[str, Any]:
+        """Return the structured persona fields for sidecar file storage.
+
+        Used by PersonaPromptBuilder to rebuild system messages per round.
+        """
+        return {
+            "user_id": self.user_id,
+            "name": self.name,
+            "user_name": self.user_name,
+            "ideology_anchor": self.ideology_anchor,
+            "core_beliefs": self.core_beliefs,
+            "verbal_tics": self.verbal_tics,
+            "never_say": self.never_say,
+            "speaking_style": self.speaking_style,
+        }
     
     def to_twitter_format(self) -> Dict[str, Any]:
         """转换为Twitter平台格式"""
@@ -118,7 +144,7 @@ class OasisAgentProfile:
         return profile
     
     def to_dict(self) -> Dict[str, Any]:
-        """转换为完整字典格式"""
+        """Convert to full dict format (includes structured persona fields)."""
         return {
             "user_id": self.user_id,
             "user_name": self.user_name,
@@ -137,6 +163,11 @@ class OasisAgentProfile:
             "interested_topics": self.interested_topics,
             "source_entity_uuid": self.source_entity_uuid,
             "source_entity_type": self.source_entity_type,
+            "ideology_anchor": self.ideology_anchor,
+            "core_beliefs": self.core_beliefs,
+            "verbal_tics": self.verbal_tics,
+            "never_say": self.never_say,
+            "speaking_style": self.speaking_style,
             "created_at": self.created_at,
         }
 
@@ -269,6 +300,12 @@ class OasisProfileGenerator:
             interested_topics=profile_data.get("interested_topics", []),
             source_entity_uuid=entity.uuid,
             source_entity_type=entity_type,
+            # Structured persona fields (Option D — drift resistance)
+            ideology_anchor=profile_data.get("ideology_anchor", ""),
+            core_beliefs=profile_data.get("core_beliefs", []) or [],
+            verbal_tics=profile_data.get("verbal_tics", []) or [],
+            never_say=profile_data.get("never_say", []) or [],
+            speaking_style=profile_data.get("speaking_style", ""),
         )
     
     def _generate_username(self, name: str) -> str:
@@ -663,13 +700,56 @@ connection to the event, and their existing actions and reactions in the event)
 6. country: Country
 7. profession: Profession
 8. interested_topics: Array of interested topics
+9. ideology_anchor: A 2-5 word tag describing this person's concrete political, \
+cultural, or professional stance. BE PARTISAN AND SPECIFIC, NOT CENTRIST. \
+Examples: "conservative populist", "progressive labor advocate", "tech libertarian", \
+"religious social conservative", "establishment moderate Democrat", \
+"free-market globalist", "academic Marxist". If the entity has no clear ideology, \
+use their professional camp (e.g., "investigative journalist", "corporate PR"). \
+Do not soften or hedge.
+10. core_beliefs: Array of 3-5 SHARP first-person declarative statements this \
+person firmly holds. Write them as literal sentences in the person's own voice. \
+Do NOT hedge, do NOT say "I believe in balance", do NOT moderate. Examples for \
+Tucker Carlson: ["The permanent Washington class despises ordinary Americans.", \
+"Immigration is being weaponized to replace the working class.", \
+"Corporate media exists to launder regime narratives."] Examples for AOC: \
+["Billionaires should not exist in a just society.", "The fossil fuel industry \
+is committing generational crimes.", "Housing is a human right, not an asset \
+class."]
+11. verbal_tics: Array of 3-5 actual phrases or sentence-openers this person \
+uses repeatedly. Use the literal wording they'd use. Examples for Tucker Carlson: \
+["Let's pause for a moment...", "Permanent Washington wants you to believe...", \
+"This is not even controversial, but...", "Ask yourself this."] Examples for AOC: \
+["Let me be very clear:", "This is a moral failure.", "We are being gaslit.", \
+"The question isn't can we afford it, it's..."]
+12. never_say: Array of 3-5 sentences this person would NEVER utter because \
+they are off-brand and contrary to their ideology. Format each as a LITERAL \
+sentence the person would refuse to say. Examples for Tucker Carlson: \
+["I stand with the ACLU's efforts to protect civil liberties.", \
+"We need more aid to Ukraine.", "The establishment has been right all along."] \
+Examples for AOC: ["The free market will solve climate change.", \
+"We should cut taxes on the wealthy.", "Corporations deserve more freedom."] \
+These are negative examples — they MUST sound like real statements the person \
+would find offensive or absurd.
+13. speaking_style: 1-2 sentences describing register, vocabulary, and \
+rhetorical habits. Example for Tucker Carlson: "Folksy populist register with \
+dramatic pauses and rhetorical questions. Uses 'folks' and 'permanent \
+Washington' as signature markers. Frames every story as elite overreach against \
+ordinary people."
 
 Important:
-- All field values must be strings or numbers; do not use newlines
+- All field values must be strings, numbers, or arrays of strings; do not use \
+unescaped newlines in strings
 - persona must be a coherent text description
 - {lang_instruction} (gender field must use English male/female)
 - Content must be consistent with entity information
 - age must be a valid integer; gender must be "male" or "female"
+- core_beliefs, verbal_tics, and never_say MUST each contain 3-5 items — do \
+not return empty arrays
+- never_say items are NEGATIVE examples — literal sentences the person would \
+refuse to say. They should sound off-brand and wrong coming from this person.
+- DO NOT soften or hedge. The character's ideology should be sharp and clearly \
+identifiable from their core_beliefs alone.
 """
 
     def _build_group_persona_prompt(
@@ -721,13 +801,55 @@ conservative
 6. country: Country
 7. profession: Institutional function description
 8. interested_topics: Array of areas of interest
+9. ideology_anchor: A 2-5 word tag describing this institution's concrete \
+ideological, commercial, or professional stance. BE PARTISAN AND SPECIFIC, NOT \
+CENTRIST. Examples: "conservative think tank", "progressive advocacy group", \
+"mainstream establishment media", "free-market business lobby", \
+"labor-aligned activist", "libertarian tech industry". For apolitical \
+institutions, use their functional stance (e.g., "rigorous investigative \
+journalism", "corporate PR defending brand", "academic institutionalist"). \
+Do not soften.
+10. core_beliefs: Array of 3-5 SHARP statements in the institution's official \
+voice. Write as literal sentences the institution would publish. Do NOT hedge. \
+Examples for Heritage Foundation: ["Limited government is the foundation of \
+American prosperity.", "Free markets are morally superior to central planning.", \
+"Judeo-Christian values built Western civilization."] Examples for the ACLU: \
+["Civil liberties are non-negotiable and universal.", "State surveillance \
+threatens democracy.", "Free speech protects the unpopular first."]
+11. verbal_tics: Array of 3-5 phrases this institution uses repeatedly in \
+public communications. Literal phrases as they'd appear in press releases or \
+posts. Examples for Heritage: ["As conservatives have long argued...", \
+"This is a direct attack on American values.", "Free enterprise demands..."] \
+Examples for ACLU: ["We will defend this right in court.", "No one is above \
+the Constitution.", "This is a civil rights issue."]
+12. never_say: Array of 3-5 sentences this institution would NEVER publish \
+because they contradict their mission. LITERAL off-brand sentences. Examples \
+for Heritage Foundation: ["The free market has failed and we need more \
+regulation.", "We support reparations.", "Progressive taxation is morally \
+justified."] Examples for ACLU: ["Some speech should be banned for public \
+safety.", "Government surveillance is necessary for security.", \
+"We defer to law enforcement judgment."] These are NEGATIVE examples — the \
+institution would find them offensive or absurd.
+13. speaking_style: 1-2 sentences describing official register and rhetorical \
+habits. Example for Heritage: "Formal think-tank voice with constitutional \
+and free-market framing. Frequently cites founders and historical precedent. \
+Avoids populist register."
 
 Important:
-- All field values must be strings or numbers; null values are not allowed
-- persona must be a coherent text description; do not use newlines
+- All field values must be strings, numbers, or arrays of strings; null values \
+not allowed
+- persona must be a coherent text description; do not use unescaped newlines \
+in strings
 - {lang_instruction} (gender field must use English "other")
 - age must be the integer 30; gender must be the string "other"
-- Institutional account statements must match their identity and positioning"""
+- Institutional account statements must match their identity and positioning
+- core_beliefs, verbal_tics, and never_say MUST each contain 3-5 items — do \
+not return empty arrays
+- never_say items are NEGATIVE examples — literal sentences the institution \
+would refuse to publish
+- DO NOT soften or hedge. The institution's ideology/stance should be sharp \
+and clearly identifiable from core_beliefs alone.
+"""
     
     def _generate_profile_rule_based(
         self,
@@ -1075,7 +1197,40 @@ Important:
                 writer.writerow(row)
         
         logger.info(f"已保存 {len(profiles)} 个Twitter Profile到 {file_path} (OASIS CSV格式)")
-    
+
+        # Write structured-persona sidecar for drift resistance (Option D)
+        self._save_persona_struct_sidecar(profiles, file_path, platform="twitter")
+
+    def _save_persona_struct_sidecar(
+        self,
+        profiles: List[OasisAgentProfile],
+        base_file_path: str,
+        platform: str,
+    ) -> None:
+        """Write structured persona fields to a sidecar JSON file.
+
+        The sidecar lives alongside the main profile file (CSV for Twitter,
+        JSON for Reddit) and contains only the structured persona fields used
+        by PersonaPromptBuilder for per-round system message regeneration.
+
+        Path convention:
+          twitter_profiles.csv -> twitter_profiles_struct.json
+          reddit_profiles.json -> reddit_profiles_struct.json
+        """
+        sim_dir = os.path.dirname(base_file_path)
+        sidecar_name = f"{platform}_profiles_struct.json"
+        sidecar_path = os.path.join(sim_dir, sidecar_name)
+
+        data = [p.to_persona_struct() for p in profiles]
+        try:
+            with open(sidecar_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            logger.info(
+                f"Wrote {len(data)} structured persona entries to {sidecar_path}"
+            )
+        except OSError as exc:
+            logger.warning(f"Failed to write persona sidecar {sidecar_path}: {exc}")
+
     def _normalize_gender(self, gender: Optional[str]) -> str:
         """
         标准化gender字段为OASIS要求的英文格式
@@ -1147,9 +1302,12 @@ Important:
         
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        
+
         logger.info(f"已保存 {len(profiles)} 个Reddit Profile到 {file_path} (JSON格式，包含user_id字段)")
-    
+
+        # Write structured-persona sidecar for drift resistance (Option D)
+        self._save_persona_struct_sidecar(profiles, file_path, platform="reddit")
+
     # 保留旧方法名作为别名，保持向后兼容
     def save_profiles_to_json(
         self,

@@ -1154,11 +1154,14 @@ async def run_twitter_simulation(
         available_actions=TWITTER_ACTIONS,
     )
 
-    # Patch Twitter agents: enforce English
-    _lang_suffix_tw = "\n\n# LANGUAGE\nYou MUST write ALL posts and responses in English only. Never use Chinese or any other language."
-    for _aid, _agent in result.agent_graph.get_agents():
-        if hasattr(_agent, 'system_message') and hasattr(_agent.system_message, 'content'):
-            _agent.system_message.content += _lang_suffix_tw
+    # Language enforcement used to be appended to system_message.content here.
+    # Now it flows through the AgentPager's platform_suffix so the per-round
+    # persona rebuild includes it consistently without double-application.
+    _lang_suffix_tw = (
+        "# LANGUAGE\n"
+        "You MUST write ALL posts and responses in English only. "
+        "Never use Chinese or any other language."
+    )
 
     # 从配置文件获取 Agent 真实名称映射（使用 entity_name 而非默认的 Agent_X）
     agent_names = get_agent_names_from_config(config)
@@ -1166,7 +1169,7 @@ async def run_twitter_simulation(
     for agent_id, agent in result.agent_graph.get_agents():
         if agent_id not in agent_names:
             agent_names[agent_id] = getattr(agent, 'name', f'Agent_{agent_id}')
-    
+
     db_path = os.path.join(simulation_dir, "twitter_simulation.db")
     if os.path.exists(db_path):
         os.remove(db_path)
@@ -1195,15 +1198,58 @@ async def run_twitter_simulation(
         )
         log_info("TWHIN-BERT cached rec enabled")
 
-    # AVM smart paging — evict all agents to stub state
+    # AVM smart paging + dynamic persona rebuild (Option D — drift fix)
     twitter_pager = None
     sim_id = config.get("simulation_id", "")
     if _avm_pager_available and sim_id and config.get("enable_paging", True):
         try:
+            from app.storage.avm import PersonaPromptBuilder
+
+            # Load structured persona sidecar written by oasis_profile_generator
+            struct_path = os.path.join(
+                simulation_dir, "twitter_profiles_struct.json"
+            )
+            structured_personas: Dict[int, Dict[str, Any]] = {}
+            if os.path.exists(struct_path):
+                try:
+                    with open(struct_path, "r", encoding="utf-8") as f:
+                        for item in json.load(f):
+                            uid = item.get("user_id")
+                            if uid is not None:
+                                structured_personas[int(uid)] = item
+                    log_info(
+                        f"Loaded {len(structured_personas)} structured "
+                        f"personas from twitter_profiles_struct.json"
+                    )
+                except Exception as exc:
+                    log_info(f"Failed to load twitter sidecar: {exc}")
+            else:
+                log_info(
+                    "No twitter_profiles_struct.json sidecar found — "
+                    "persona drift resistance disabled for this run"
+                )
+
+            persona_builder = (
+                PersonaPromptBuilder(structured_personas)
+                if structured_personas else None
+            )
+
             storage = get_storage()
-            twitter_pager = AgentPager(storage, sim_id, "twitter")
+            twitter_pager = AgentPager(
+                storage,
+                sim_id,
+                "twitter",
+                persona_builder=persona_builder,
+                agent_names=agent_names,
+                platform_suffix=_lang_suffix_tw,
+                restore_chat_history=False,
+            )
+            twitter_pager.cache_base_personas(result.agent_graph)
             twitter_pager.evict_all(result.agent_graph)
-            log_info("AVM paging enabled")
+            log_info(
+                f"AVM paging enabled "
+                f"(persona_rebuild={persona_builder is not None})"
+            )
         except Exception as exc:
             log_info(f"AVM paging unavailable: {exc}")
             twitter_pager = None
@@ -1399,20 +1445,21 @@ async def run_reddit_simulation(
         available_actions=REDDIT_ACTIONS,
     )
 
-    # Patch Reddit agents: enforce English + reduce output tokens
-    _lang_suffix = "\n\n# LANGUAGE\nYou MUST write ALL posts, comments, and responses in English only. Never use Chinese or any other language."
+    # Language enforcement + output efficiency rules. These used to be
+    # appended to system_message.content directly. Now they flow through
+    # AgentPager.platform_suffix and get applied on every per-round rebuild.
+    _lang_suffix = (
+        "# LANGUAGE\n"
+        "You MUST write ALL posts, comments, and responses in English only. "
+        "Never use Chinese or any other language."
+    )
     _concise_suffix = (
         "\n\n# OUTPUT EFFICIENCY\n"
         "When choosing non-content actions (DO_NOTHING, SEARCH_POSTS, SEARCH_USER, "
         "TREND, REFRESH, FOLLOW, MUTE, LIKE_POST, DISLIKE_POST, LIKE_COMMENT, "
         "DISLIKE_COMMENT), respond with ONLY the action JSON. No explanation or reasoning."
     )
-    _patched = 0
-    for _aid, _agent in result.agent_graph.get_agents():
-        if hasattr(_agent, 'system_message') and hasattr(_agent.system_message, 'content'):
-            _agent.system_message.content += _lang_suffix + _concise_suffix
-            _patched += 1
-    log_info(f"Patched {_patched} agents with English + concise output instruction")
+    _reddit_platform_suffix = _lang_suffix + _concise_suffix
 
     # 从配置文件获取 Agent 真实名称映射（使用 entity_name 而非默认的 Agent_X）
     agent_names = get_agent_names_from_config(config)
@@ -1449,15 +1496,58 @@ async def run_reddit_simulation(
         )
         log_info("TWHIN-BERT cached rec enabled (Reddit)")
 
-    # AVM smart paging — evict all agents to stub state
+    # AVM smart paging + dynamic persona rebuild (Option D — drift fix)
     reddit_pager = None
     sim_id = config.get("simulation_id", "")
     if _avm_pager_available and sim_id and config.get("enable_paging", True):
         try:
+            from app.storage.avm import PersonaPromptBuilder
+
+            # Load structured persona sidecar written by oasis_profile_generator
+            struct_path = os.path.join(
+                simulation_dir, "reddit_profiles_struct.json"
+            )
+            structured_personas: Dict[int, Dict[str, Any]] = {}
+            if os.path.exists(struct_path):
+                try:
+                    with open(struct_path, "r", encoding="utf-8") as f:
+                        for item in json.load(f):
+                            uid = item.get("user_id")
+                            if uid is not None:
+                                structured_personas[int(uid)] = item
+                    log_info(
+                        f"Loaded {len(structured_personas)} structured "
+                        f"personas from reddit_profiles_struct.json"
+                    )
+                except Exception as exc:
+                    log_info(f"Failed to load reddit sidecar: {exc}")
+            else:
+                log_info(
+                    "No reddit_profiles_struct.json sidecar found — "
+                    "persona drift resistance disabled for this run"
+                )
+
+            persona_builder = (
+                PersonaPromptBuilder(structured_personas)
+                if structured_personas else None
+            )
+
             storage = get_storage()
-            reddit_pager = AgentPager(storage, sim_id, "reddit")
+            reddit_pager = AgentPager(
+                storage,
+                sim_id,
+                "reddit",
+                persona_builder=persona_builder,
+                agent_names=agent_names,
+                platform_suffix=_reddit_platform_suffix,
+                restore_chat_history=False,
+            )
+            reddit_pager.cache_base_personas(result.agent_graph)
             reddit_pager.evict_all(result.agent_graph)
-            log_info("AVM paging enabled")
+            log_info(
+                f"AVM paging enabled "
+                f"(persona_rebuild={persona_builder is not None})"
+            )
         except Exception as exc:
             log_info(f"AVM paging unavailable: {exc}")
             reddit_pager = None

@@ -121,6 +121,77 @@ DeepMiro is a performance-focused fork of the original [MiroFish](https://github
 | **LLM provider** | Alibaba Qwen (hardcoded) | Any OpenAI-compatible API |
 | **Deployment** | Docker only | Docker + Helm chart + k3s-ready |
 
+## Persona Fidelity: How DeepMiro Keeps Agents In Character
+
+Multi-agent LLM simulations have a dirty secret: **personas drift**. By round 20, Tucker Carlson starts quoting the ACLU. By round 45, Marco Rubio sounds like Bernie Sanders. Every distinct voice collapses into the same bland "helpful assistant" register.
+
+This isn't a prompting problem — it's an attention decay problem. [Kim et al. (COLM 2024)](https://arxiv.org/abs/2402.10962) proved that LLM attention to system-prompt tokens decays geometrically over turns. LLaMA2-70B drifts significantly within **8 turns**. Larger models drift more, not less. A 2KB persona cannot compete with 50KB of accumulated conversation history.
+
+Every naive multi-agent simulation hits this wall. DeepMiro doesn't, because we copied what [Stanford's Generative Agents (Park et al. 2023)](https://arxiv.org/abs/2304.03442) did for their 25-agent Smallville simulation — with some practical shortcuts.
+
+### What we do
+
+**1. Structured personas with explicit negative examples.**
+Every agent gets a structured profile alongside the prose bio:
+- `ideology_anchor` — a 2-5 word partisan tag ("conservative populist", "progressive labor")
+- `core_beliefs` — 3-5 first-person declarative statements, no hedging
+- `verbal_tics` — 3-5 literal phrases the person actually uses
+- `never_say` — 3-5 sentences the person would refuse to utter
+- `speaking_style` — register + rhetorical habits
+
+The `never_say` block is the drift killer. Models drift toward the centroid of what they say. Explicit negative examples (*"Tucker Carlson would never say 'I stand with the ACLU'"*) anchor the LLM against that collapse.
+
+**2. Dynamic persona regeneration per round.**
+Instead of locking the persona in at the system-prompt level and watching attention decay from round 1, we rebuild `system_message.content` before every agent acts. Each round, the agent sees a fresh **third-person** character brief:
+
+```
+# Character Brief: Tucker Carlson
+
+The agent in this conversation is Tucker Carlson.
+You are simulating how Tucker Carlson would respond.
+
+## What Tucker Carlson Would NEVER Say
+- "I stand with the ACLU"
+- "We need to find common ground with progressives"
+...
+
+## What Tucker Carlson Has Said Recently
+- "Permanent Washington wants you to believe..."
+- "Let's pause for a moment — they're not even hiding it"
+...
+
+## Task
+What would Tucker Carlson actually do? React in his authentic voice.
+Do not become a neutral assistant. Do not seek balance.
+```
+
+The persona never gets stale because it's built fresh from the same structured fields every turn.
+
+**3. Third-person framing.**
+"You are Tucker Carlson" triggers RLHF helpful-assistant sycophancy — the model tries to be polite and balanced because that's how it was trained to respond to "you are X" instructions. Third-person framing ("the agent is Tucker Carlson", "what would Tucker Carlson do?") bypasses that trigger entirely. This single change is load-bearing.
+
+**4. Self-consistency anchor.**
+Each round injects the agent's **own** 3 most recent posts as reference material. Tucker Carlson sees what he just said, which makes him more likely to say something consistent with it. This is cheap drift resistance — no extra LLM calls, just reading from the action log.
+
+**5. No accumulated chat history.**
+Unlike naive multi-agent setups, DeepMiro does NOT feed each agent the rolling conversation history from previous rounds. Agents get their fresh persona + the current feed observations. Attention stays focused on character + present context, not on 50KB of stale noise.
+
+### What we don't do
+
+- **We don't script reactions.** Agents aren't told "mock liberal content" or "support conservative content" — that would script the outcome and destroy the simulation's predictive value. The emergent behavior is the whole point.
+- **We don't filter feeds by ideology.** Tucker Carlson sees AOC's posts. That's how he has something to push back against. Echo chambers are not simulations.
+- **We don't fork OASIS.** The entire fix is a runtime wrapper around CAMEL's agent pager. No upstream drift, no fork maintenance.
+
+### Research foundations
+
+| Technique | Source |
+|---|---|
+| Attention decay over system prompts | [Kim et al. — Measuring and Controlling Persona Drift (COLM 2024)](https://arxiv.org/abs/2402.10962) |
+| Third-person framing bypasses RLHF sycophancy | [Park et al. — Generative Agents (Stanford 2023)](https://arxiv.org/abs/2304.03442) |
+| Negative examples > positive instruction | [Examining Identity Drift in LLM Agents (arXiv 2412.00804)](https://arxiv.org/abs/2412.00804) |
+| Dynamic persona summary per action | [Park et al. — Generative Agents (Stanford 2023)](https://arxiv.org/abs/2304.03442) |
+| JSON personas collapse to neutral register | [Persona-Aware Contrastive Learning (ACL 2025)](https://aclanthology.org/2025.findings-acl.1344.pdf) |
+
 ### Benchmarks
 
 15-agent quick simulation, enriched prompt, measured end-to-end:

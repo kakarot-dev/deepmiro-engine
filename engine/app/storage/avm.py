@@ -7,13 +7,23 @@ is loaded on-demand before each round and evicted afterward.
 
 Memory budget:  500 agents x persona only + 20 active x full context
               = ~1-2 GB  (vs 7-10 GB without paging)
+
+Option D (persona drift fix): AgentPager also rebuilds each agent's
+system_message.content per round via PersonaPromptBuilder. This
+counteracts attention decay over long conversations by re-injecting
+ideology, negative examples, and recent own-posts fresh each turn.
 """
 
 import json
 import logging
+import re
 from typing import Dict, Any, List, Optional, Set
 
 logger = logging.getLogger("mirofish.avm")
+
+# Regex to strip the OASIS default "You are X." opener from cached persona
+# prose. Second-person framing triggers RLHF helpful-assistant sycophancy.
+_YOU_ARE_PREFIX = re.compile(r"^You are [^.\n]{0,200}[.\n]\s*", re.IGNORECASE)
 
 
 class AgentVirtualMemory:
@@ -302,6 +312,185 @@ class AgentVirtualMemory:
 
 
 # =====================================================================
+# PersonaPromptBuilder — dynamic system message rebuilding (Option D)
+# =====================================================================
+
+
+class PersonaPromptBuilder:
+    """Builds dynamic third-person persona system messages per round.
+
+    The LLM's attention to the system prompt decays geometrically over
+    long conversations (Kim et al., COLM 2024). Re-injecting a fresh,
+    structured persona before every agent action counteracts this.
+
+    Design choices:
+
+    - **Third-person framing** ("The agent is X", "What would X do?")
+      bypasses RLHF helpful-assistant sycophancy that "You are X"
+      triggers. Load-bearing for drift resistance.
+    - **Markdown with headers + bullets** is the preferred format.
+      JSON pulls LLMs toward neutral structured register; pure prose
+      loses structural anchors. Markdown hybrid wins empirically.
+    - **Negative examples (`never_say`)** are the single biggest
+      drift killer. Models drift toward the centroid of what they
+      say; explicit anti-examples anchor them against it.
+    - **Recent own-posts** inject self-consistency anchor. The agent
+      sees what *they* just said and stays in that voice.
+
+    Usage::
+
+        builder = PersonaPromptBuilder(structured_personas)
+        new_system_msg = builder.build(
+            agent_id=7,
+            agent_name="Tucker Carlson",
+            base_persona_prose="Tucker Carlson is a conservative...",
+            recent_own_actions=[{"action_type": "CREATE_POST", ...}],
+            platform_suffix="# LANGUAGE\\nYou MUST write in English.",
+        )
+        agent.system_message.content = new_system_msg
+    """
+
+    def __init__(self, structured_personas: Dict[int, Dict[str, Any]]):
+        """
+        Args:
+            structured_personas: {agent_id: {"ideology_anchor": str,
+                "core_beliefs": [...], "verbal_tics": [...],
+                "never_say": [...], "speaking_style": str}}
+        """
+        self._struct = structured_personas
+
+    def build(
+        self,
+        agent_id: int,
+        agent_name: str,
+        base_persona_prose: str = "",
+        recent_own_actions: Optional[List[Dict[str, Any]]] = None,
+        platform_suffix: str = "",
+    ) -> str:
+        """Build the dynamic system message for one agent.
+
+        Returns a markdown string ready to assign to
+        ``agent.system_message.content``.
+        """
+        s = self._struct.get(agent_id, {})
+        ideology = (s.get("ideology_anchor") or "").strip()
+        core_beliefs = s.get("core_beliefs") or []
+        verbal_tics = s.get("verbal_tics") or []
+        never_say = s.get("never_say") or []
+        speaking_style = (s.get("speaking_style") or "").strip()
+
+        lines: List[str] = []
+
+        # ── Third-person framing block ──
+        lines.append(f"# Character Brief: {agent_name}")
+        lines.append("")
+        lines.append(
+            f"The agent in this conversation is {agent_name}. "
+            f"You are simulating how {agent_name} would respond — "
+            f"not how an assistant would. "
+            f"Stay in character as {agent_name} at all times."
+        )
+        lines.append("")
+
+        # ── Ideology anchor ──
+        if ideology:
+            lines.append(f"## Ideological Position")
+            lines.append(f"{agent_name} is a {ideology}.")
+            lines.append("")
+
+        # ── Core beliefs as first-person statements ──
+        if core_beliefs:
+            lines.append(f"## What {agent_name} Believes")
+            for belief in core_beliefs:
+                b = str(belief).strip()
+                if b:
+                    lines.append(f"- {b}")
+            lines.append("")
+
+        # ── Speaking style ──
+        if speaking_style:
+            lines.append(f"## How {agent_name} Speaks")
+            lines.append(speaking_style)
+            lines.append("")
+
+        if verbal_tics:
+            lines.append(f"### Phrases {agent_name} actually uses")
+            for tic in verbal_tics:
+                t = str(tic).strip()
+                if t:
+                    lines.append(f'- "{t}"')
+            lines.append("")
+
+        # ── Negative examples (the drift killer) ──
+        if never_say:
+            lines.append(f"## What {agent_name} Would NEVER Say")
+            lines.append(
+                f"{agent_name} would refuse to make the following statements. "
+                f"They are off-brand and contrary to {agent_name}'s ideology:"
+            )
+            for phrase in never_say:
+                p = str(phrase).strip()
+                if p:
+                    lines.append(f'- "{p}"')
+            lines.append("")
+            lines.append(
+                f"If a response would resemble any of the above, rewrite it "
+                f"to match {agent_name}'s actual position."
+            )
+            lines.append("")
+
+        # ── Narrative persona body (existing prose) ──
+        if base_persona_prose:
+            lines.append(f"## Background")
+            lines.append(base_persona_prose.strip())
+            lines.append("")
+
+        # ── Recent own posts (self-consistency anchor) ──
+        if recent_own_actions:
+            content_posts = []
+            for action in recent_own_actions:
+                if not isinstance(action, dict):
+                    continue
+                args = action.get("action_args") or {}
+                if not isinstance(args, dict):
+                    continue
+                content = args.get("content") or args.get("comment") or ""
+                if isinstance(content, str) and content.strip():
+                    content_posts.append(content.strip())
+                if len(content_posts) >= 3:
+                    break
+
+            if content_posts:
+                lines.append(f"## What {agent_name} Has Said Recently")
+                lines.append(
+                    f"These are {agent_name}'s own most recent posts. "
+                    f"Stay consistent with this voice and do not contradict them:"
+                )
+                for content in content_posts:
+                    excerpt = content[:280].replace("\n", " ")
+                    lines.append(f'- "{excerpt}"')
+                lines.append("")
+
+        # ── Reaction framing ──
+        lines.append("## Task")
+        lines.append(
+            f"When asked what to do next, answer: "
+            f"what would {agent_name} actually do in this situation? "
+            f"React in {agent_name}'s authentic voice. "
+            f"Do not become a neutral assistant. "
+            f"Do not seek balance. "
+            f"Do not quote opposing organizations or positions."
+        )
+
+        # ── Platform suffix (language enforcement, efficiency rules, etc.) ──
+        if platform_suffix:
+            lines.append("")
+            lines.append(platform_suffix.strip())
+
+        return "\n".join(lines)
+
+
+# =====================================================================
 # AgentPager — hydrate / evict OASIS agent memory per round
 # =====================================================================
 
@@ -330,24 +519,129 @@ class AgentPager:
         pager.evict_all(agent_graph)
     """
 
-    def __init__(self, storage, simulation_id: str, platform: str):
+    def __init__(
+        self,
+        storage,
+        simulation_id: str,
+        platform: str,
+        persona_builder: Optional["PersonaPromptBuilder"] = None,
+        agent_names: Optional[Dict[int, str]] = None,
+        platform_suffix: str = "",
+        restore_chat_history: bool = False,
+    ):
+        """
+        Args:
+            storage: SurrealDBStorage instance.
+            simulation_id: Owning simulation.
+            platform: "twitter" or "reddit".
+            persona_builder: Optional PersonaPromptBuilder. When provided,
+                ``hydrate`` will rebuild each agent's system_message.content
+                fresh before every round using structured persona fields.
+            agent_names: Optional {agent_id: display_name} map. Used by the
+                persona builder's third-person framing.
+            platform_suffix: Optional string appended to every rebuilt system
+                message (e.g. language enforcement, output efficiency rules).
+            restore_chat_history: If False (default), hydrate does NOT
+                restore accumulated chat memory from SurrealDB. This is the
+                persona drift fix — accumulated history drowns the system
+                prompt's attention weight and causes bland centrist drift.
+                Set True to restore legacy behavior (diagnostic / forensics).
+        """
         self._storage = storage
         self._simulation_id = simulation_id
         self._platform = platform
         self._hydrated: Set[int] = set()
+        self._persona_builder = persona_builder
+        self._agent_names = dict(agent_names) if agent_names else {}
+        self._platform_suffix = platform_suffix
+        self._restore_chat_history = restore_chat_history
+        # Cache of stripped base persona prose, keyed by agent_id.
+        # Populated once via cache_base_personas before the first round.
+        self._base_persona: Dict[int, str] = {}
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
+    def cache_base_personas(self, agent_graph) -> None:
+        """Snapshot each agent's starting persona prose.
+
+        Called ONCE at startup, after OASIS generates the agent graph.
+        Strips the "You are X." opener so subsequent rebuilds don't leak
+        second-person RLHF-sycophancy-triggering language into the
+        Background section of the new template.
+        """
+        count = 0
+        try:
+            for aid, agent in agent_graph.get_agents():
+                if not hasattr(agent, "system_message"):
+                    continue
+                sys_msg = agent.system_message
+                if sys_msg is None or not hasattr(sys_msg, "content"):
+                    continue
+                content = sys_msg.content or ""
+                stripped = _YOU_ARE_PREFIX.sub("", content, count=1)
+                self._base_persona[aid] = stripped.strip()
+                count += 1
+        except Exception as exc:
+            logger.warning("AgentPager: cache_base_personas failed: %s", exc)
+        logger.info(
+            "AgentPager: cached %d base personas for %s",
+            count, self._platform,
+        )
+
     def hydrate(self, agent_graph, agent_ids: List[int]) -> None:
-        """Restore chat memory for agents about to act this round."""
+        """Prepare agents about to act this round.
+
+        With Option D enabled (persona_builder set, restore_chat_history
+        False), this rebuilds each agent's system_message.content fresh
+        using structured persona + recent own-posts. Accumulated chat
+        history from previous rounds is NOT restored.
+
+        In legacy mode (no persona_builder, or restore_chat_history True),
+        behaves like the original implementation and restores chat memory
+        from SurrealDB.
+        """
         if not agent_ids:
             return
 
-        memories = self._storage.load_agent_memories_batch(
-            self._simulation_id, agent_ids, self._platform,
-        )
+        # ── Legacy chat-history restore path (opt-in) ──
+        memories: Dict[int, str] = {}
+        if self._restore_chat_history:
+            try:
+                memories = self._storage.load_agent_memories_batch(
+                    self._simulation_id, agent_ids, self._platform,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "AgentPager: load_agent_memories_batch failed: %s", exc
+                )
+
+        # ── Option D path: load recent own-actions for each agent ──
+        own_actions: Dict[int, List[Dict[str, Any]]] = {}
+        if self._persona_builder is not None:
+            avm = AgentVirtualMemory(self._storage)
+            for aid in agent_ids:
+                try:
+                    ctx = avm.load_agent_context(
+                        self._simulation_id,
+                        aid,
+                        recent_actions_limit=10,
+                    )
+                    actions = ctx.get("recent_actions") or []
+                    own_actions[aid] = [
+                        a for a in actions
+                        if isinstance(a, dict)
+                        and a.get("action_type") in (
+                            "CREATE_POST", "CREATE_COMMENT", "QUOTE_POST"
+                        )
+                    ]
+                except Exception as exc:
+                    logger.debug(
+                        "AgentPager: load own-actions failed for %d: %s",
+                        aid, exc,
+                    )
+                    own_actions[aid] = []
 
         for aid in agent_ids:
             try:
@@ -355,15 +649,38 @@ class AgentPager:
             except Exception:
                 continue
 
+            # ── Legacy memory restore (off by default) ──
             records_json = memories.get(aid)
-            if records_json:
+            if records_json and self._restore_chat_history:
                 self._restore_memory(agent, records_json)
+
+            # ── Option D: rebuild system_message.content ──
+            if self._persona_builder is not None and hasattr(agent, "system_message"):
+                try:
+                    agent_name = self._agent_names.get(
+                        aid, getattr(agent, "name", f"Agent_{aid}")
+                    )
+                    base_prose = self._base_persona.get(aid, "")
+                    new_content = self._persona_builder.build(
+                        agent_id=aid,
+                        agent_name=agent_name,
+                        base_persona_prose=base_prose,
+                        recent_own_actions=own_actions.get(aid, []),
+                        platform_suffix=self._platform_suffix,
+                    )
+                    agent.system_message.content = new_content
+                except Exception as exc:
+                    logger.debug(
+                        "AgentPager: persona rebuild failed for %d: %s",
+                        aid, exc,
+                    )
 
             self._hydrated.add(aid)
 
         logger.debug(
-            "AgentPager: hydrated %d agents for %s",
+            "AgentPager: hydrated %d agents for %s (persona_rebuild=%s)",
             len(agent_ids), self._platform,
+            self._persona_builder is not None,
         )
 
     def evict_all(self, agent_graph) -> None:
