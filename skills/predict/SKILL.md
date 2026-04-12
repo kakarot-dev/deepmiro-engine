@@ -141,29 +141,71 @@ If large document uploaded, suggest deep: "This is a detailed document — runni
 
 Call `create_simulation` with prompt, document_id (optional), preset.
 
-> "Simulation started! I'll narrate what happens as the personas interact.
-> You can keep working — I'll update you as it progresses."
+After calling `create_simulation`, immediately schedule a background check-in using `CronCreate`:
 
-### Step 5: Monitor and narrate
+```
+CronCreate(
+  cron: "*/2 * * * *",   // every 2 minutes
+  recurring: true,
+  prompt: "Check simulation_status for <sim_id>. If still running, share any new interesting agent activity briefly. If completed, call get_report and present it. If failed, tell the user what went wrong. Delete this cron job once the simulation is complete or failed."
+)
+```
 
-Poll `simulation_status` every 30 seconds. Narrate naturally based on `phase`:
+Then tell the user something short:
+> "Started your prediction. I'll check on it every couple minutes and update you as the personas start reacting."
 
-**building_graph:**
-> "Building a knowledge graph from your input... extracting entities and relationships. {progress}%"
+Do NOT:
+- Mention "graph building", "generating profiles", "phases", "pipeline", "personas are built", or any internal steps
+- Show simulation IDs like `sim_xxxxx` or `pending_proj_xxxxx` to the user (keep them internal — use them when calling tools, never print)
+- Dump percentages, round counts like "Round 0/72", or action counters
+- Pre-describe what the report will contain
 
-**generating_profiles:**
-> "Creating personas: {profiles_generated} of {entities_count} ready — {recent_profiles}"
-> Example: "Li Wei (Student), Prof. Zhang (Faculty), Campus Daily (Media)..."
+The user only needs to see **what the personas are doing/saying**, not how the backend is running.
 
-**simulating:**
-Narrate the simulation like a story. Use entity names and action content from `recent_actions`:
-> "Round 15/40 — 127 interactions so far.
-> Prof. Zhang just tweeted: 'Our research output this semester shows remarkable growth...'
-> Li Wei liked the post. Chongqing Upstream News is discussing the controversy on Reddit."
+### Step 5: Narrate what the agents do
+
+On each check-in (triggered by the scheduled cron), call `simulation_status` and share only what's interesting — **what the personas are saying or doing**.
+
+**While still setting up:** say nothing at all. Skip this check-in. Wait for the next one.
+
+**While simulating:** narrate real agent activity from `recent_actions`. Quote them naturally:
+> "Prof. Zhang just posted: 'Our research output this semester shows remarkable growth...'
+> Meanwhile Li Wei is liking every Chongqing Upstream News post."
+
+Use actual names and post content. Do NOT mention:
+- Round numbers, action counts, percentages
+- Simulation IDs
+- "Phase" names or pipeline steps
+- Backend status like "graph ready" or "agents spawned"
+
+Make it feel like a story unfolding — the kind of thing you'd read in a live-blog, not a server log.
+
+**completed:** Call `CronDelete` with the cron job ID to stop the check-ins, then move to Step 6 — call `get_report` and present the report.
+
+**failed:** Call `CronDelete` to stop check-ins, tell the user what went wrong in one sentence, offer to retry.
+
+### Background hook (automatic)
+
+There's also a hook (`hooks/check-predictions.sh` — UserPromptSubmit) that fires on every user message and injects a notification when a prediction completes. It's a safety net — if the cron gets lost (session restart, crash), the hook will still alert Claude on the next user prompt.
+
+If the hook injects a "prediction X completed" message but you've already handled it via the cron, just acknowledge briefly and don't re-present the report.
+
+**While still setting up (phase = building_graph or generating_profiles):**
+Say nothing, or at most one short line like:
+> "Still setting up..."
+
+Don't announce "building graph" or "generating personas" or percentages. That's internal noise.
+
+**While simulating (phase = simulating):**
+Narrate real agent activity from `recent_actions`. Quote them:
+> "Prof. Zhang just posted: 'Our research output this semester shows remarkable growth...'
+> Meanwhile Li Wei is liking every Chongqing Upstream News post."
+
+Use actual names and content. Make it feel like you're watching a story unfold, not reading logs.
 
 **completed:** Move to Step 6.
 
-If over 15 minutes: "The deep simulation is still running — I'll let you know when it's done. Feel free to keep working."
+If over 15 minutes: "Still running — I'll let you know when it's done."
 
 ### Step 6: Present report
 
