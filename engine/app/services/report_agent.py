@@ -1754,8 +1754,68 @@ class ReportAgent:
             ]
         )
     
+    @staticmethod
+    def _strip_llm_scratchpad(text: str) -> str:
+        """Remove LLM internal reasoning/tool markup from a response.
+
+        Handles three classes of leakage:
+
+        1. ``<tool_call>...</tool_call>`` — the schema we instruct the
+           model to use for our own ReACT tool protocol. Normally
+           parsed out by ``_parse_tool_calls``, but a conflict-handler
+           downgrade path can let one slip into the final answer.
+
+        2. OpenAI **harmony response format** — ``<|channel|>``,
+           ``<|message|>``, ``<|end|>``, ``<|start|>``, ``<|call|>``
+           tokens. These are structural markers used by gpt-oss-*
+           models for chain-of-thought channels (``analysis``,
+           ``commentary``, ``final``) and tool calls. Well-behaved
+           provider SDKs strip them; some Fireworks/Ollama paths
+           don't, and the raw scratchpad lands in our final answer.
+
+        3. ``<thinking>...</thinking>`` style blocks used by some
+           Anthropic-compatible models.
+
+        Safe to run on any content — the regexes are anchored on
+        special-token markers that should never appear in legitimate
+        prose, so there are no false positives.
+        """
+        if not text:
+            return text
+
+        # 1. Our own tool-call schema
+        text = re.sub(r'<tool_call>.*?</tool_call>', '', text, flags=re.DOTALL)
+
+        # 2. OpenAI harmony format.
+        # Strip the entire <|start|>role<|channel|>...<|end|>/<|call|>
+        # block together — this pattern leaves no orphan role names
+        # (the plain word "assistant") behind.
+        text = re.sub(
+            r'<\|start\|>[^<]*?<\|channel\|>.*?<\|(?:end|call|return)\|>',
+            '',
+            text,
+            flags=re.DOTALL,
+        )
+        # Strip any standalone channel block that wasn't preceded by a
+        # <|start|> marker (happens at the very beginning of a response).
+        text = re.sub(
+            r'<\|channel\|>.*?<\|(?:end|call|return)\|>',
+            '',
+            text,
+            flags=re.DOTALL,
+        )
+        # Catch-all for any remaining harmony special tokens.
+        text = re.sub(r'<\|[^|]{0,40}\|>', '', text)
+
+        # 3. Anthropic-style thinking blocks
+        text = re.sub(
+            r'<thinking>.*?</thinking>', '', text, flags=re.DOTALL | re.IGNORECASE
+        )
+
+        return text.strip()
+
     def _generate_section_react(
-        self, 
+        self,
         section: ReportSection,
         outline: ReportOutline,
         previous_sections: List[str],
@@ -1928,8 +1988,9 @@ class ReportAgent:
 
                 # 正常结束
                 final_answer = response.split("Final Answer:")[-1].strip()
-                # Strip any leaked tool call markup from the final answer
-                final_answer = re.sub(r'<tool_call>.*?</tool_call>', '', final_answer, flags=re.DOTALL).strip()
+                # Strip leaked LLM scratchpad: tool-call markup AND
+                # harmony-format reasoning channels (seen with gpt-oss-*).
+                final_answer = self._strip_llm_scratchpad(final_answer)
 
                 # Anti-hallucination pass: strip attributions referring to
                 # agents that don't exist in this simulation (e.g., JBS,
@@ -2040,7 +2101,7 @@ class ReportAgent:
             # 工具调用已足够，LLM 输出了内容但没带 "Final Answer:" 前缀
             # 直接将这段内容作为最终答案，不再空转
             logger.info(t('report.sectionNoPrefix', title=section.title, count=tool_calls_count))
-            final_answer = re.sub(r'<tool_call>.*?</tool_call>', '', response, flags=re.DOTALL).strip()
+            final_answer = self._strip_llm_scratchpad(response)
 
             final_answer, hallucinated_names = self._validate_quote_attributions(final_answer)
             if hallucinated_names:
@@ -2077,9 +2138,9 @@ class ReportAgent:
         else:
             final_answer = response
 
-        # Strip any leaked tool call markup
+        # Strip leaked LLM scratchpad (tool calls + harmony reasoning)
         if final_answer:
-            final_answer = re.sub(r'<tool_call>.*?</tool_call>', '', final_answer, flags=re.DOTALL).strip()
+            final_answer = self._strip_llm_scratchpad(final_answer)
 
             final_answer, hallucinated_names = self._validate_quote_attributions(final_answer)
             if hallucinated_names:
@@ -2405,9 +2466,9 @@ class ReportAgent:
             
             if not tool_calls:
                 # 没有工具调用，直接返回响应
-                clean_response = re.sub(r'<tool_call>.*?</tool_call>', '', response, flags=re.DOTALL)
+                clean_response = self._strip_llm_scratchpad(response)
                 clean_response = re.sub(r'\[TOOL_CALL\].*?\)', '', clean_response)
-                
+
                 return {
                     "response": clean_response.strip(),
                     "tool_calls": tool_calls_made,
@@ -2441,7 +2502,7 @@ class ReportAgent:
         )
         
         # 清理响应
-        clean_response = re.sub(r'<tool_call>.*?</tool_call>', '', final_response, flags=re.DOTALL)
+        clean_response = self._strip_llm_scratchpad(final_response)
         clean_response = re.sub(r'\[TOOL_CALL\].*?\)', '', clean_response)
         
         return {
