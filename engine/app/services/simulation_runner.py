@@ -605,6 +605,12 @@ class SimulationRunner:
                 state.runner_status = RunnerStatus.COMPLETED
                 state.completed_at = datetime.now().isoformat()
                 logger.info(f"模拟完成: {simulation_id}")
+                # Propagate completion to the outer Simulation state.
+                # Without this, the outer state.json stays at "running"
+                # forever and MCP/UI never sees the sim finish — the
+                # only path that updated it before was the manual
+                # /api/simulation/close-env endpoint.
+                cls._mark_outer_simulation_completed(simulation_id)
             else:
                 state.runner_status = RunnerStatus.FAILED
                 # Extract a clean English error summary from the subprocess
@@ -862,6 +868,48 @@ class SimulationRunner:
         except Exception as exc:
             logger.error(
                 "Failed to mark outer Simulation state as FAILED for %s: %s",
+                simulation_id, exc,
+            )
+
+    @classmethod
+    def _mark_outer_simulation_completed(cls, simulation_id: str) -> None:
+        """Propagate successful completion to the outer Simulation state.
+
+        Mirror of _mark_outer_simulation_failed for the success path.
+        Without this, sims that finish naturally leave the outer
+        Simulation.status at "running" indefinitely — only the manual
+        /api/simulation/close-env endpoint used to flip it to COMPLETED.
+        """
+        try:
+            from .simulation_manager import SimulationManager, SimulationStatus
+        except Exception as exc:
+            logger.warning("Cannot import SimulationManager to mark completed: %s", exc)
+            return
+        try:
+            manager = SimulationManager()
+            outer_state = manager.get_simulation(simulation_id)
+            if outer_state is None:
+                logger.warning("No outer state for %s when marking completed", simulation_id)
+                return
+            # Don't clobber a state that's already terminal (FAILED,
+            # STOPPED, INTERRUPTED) — completion shouldn't override an
+            # explicit failure marker if both racetrack signals fire.
+            if outer_state.status in (
+                SimulationStatus.FAILED,
+                SimulationStatus.STOPPED,
+                SimulationStatus.INTERRUPTED,
+            ):
+                logger.info(
+                    "Skipping COMPLETED mark for %s (already terminal: %s)",
+                    simulation_id, outer_state.status.value,
+                )
+                return
+            outer_state.status = SimulationStatus.COMPLETED
+            manager._save_simulation_state(outer_state)
+            logger.info("Marked outer Simulation state COMPLETED for %s", simulation_id)
+        except Exception as exc:
+            logger.error(
+                "Failed to mark outer Simulation state as COMPLETED for %s: %s",
                 simulation_id, exc,
             )
 

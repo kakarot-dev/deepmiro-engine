@@ -18,9 +18,115 @@ from .utils.logger import setup_logger, get_logger
 
 def _recover_interrupted_simulations(logger):
     """
-    Detect simulations that were marked 'running' in SurrealDB but whose
-    PID is no longer alive.  Mark them as 'interrupted' so users know.
+    Reconcile orphaned simulations on pod startup.
+
+    Two failure modes addressed here:
+
+    1. **Pod OOMKilled mid-sim** — the OASIS subprocess dies with the
+       pod, but the on-disk run_state.json still says "running" with
+       the dead PID. New pod has no monitor thread to update it.
+    2. **Sim completed but outer state never propagated** — for sims
+       that finished BEFORE v0.9.8's _mark_outer_simulation_completed
+       fix, the inner runner_status is "completed" but the outer
+       state.json still says "running", so MCP/UI never sees the sim
+       finish.
+
+    The scan walks every simulation directory on disk, compares the
+    outer state.json against the inner run_state.json, and reconciles
+    both atomically. Old SurrealDB-only path is kept as well (some
+    deployments may have rows that aren't on this pod's PVC).
     """
+    # ── Disk scan: reconcile state.json ↔ run_state.json ──
+    try:
+        import os
+        import json
+        from .config import Config
+        from .services.simulation_manager import SimulationManager, SimulationStatus
+
+        sim_dir_root = Config.OASIS_SIMULATION_DATA_DIR
+        if not os.path.exists(sim_dir_root):
+            logger.info("Recovery: simulation root %s missing, skipping disk scan", sim_dir_root)
+        else:
+            manager = SimulationManager()
+            reconciled = 0
+            for sim_id in os.listdir(sim_dir_root):
+                sim_path = os.path.join(sim_dir_root, sim_id)
+                if not os.path.isdir(sim_path):
+                    continue
+                state_file = os.path.join(sim_path, "state.json")
+                run_state_file = os.path.join(sim_path, "run_state.json")
+                if not os.path.exists(state_file):
+                    continue
+                try:
+                    with open(state_file, "r", encoding="utf-8") as f:
+                        outer = json.load(f)
+                except Exception as exc:
+                    logger.warning("Recovery: %s state.json unreadable: %s", sim_id, exc)
+                    continue
+
+                outer_status = outer.get("status", "")
+                if outer_status not in ("running", "starting"):
+                    continue  # Not a candidate for reconciliation
+
+                # Look at the inner run_state for the actual outcome.
+                runner_status = None
+                if os.path.exists(run_state_file):
+                    try:
+                        with open(run_state_file, "r", encoding="utf-8") as f:
+                            run = json.load(f)
+                        runner_status = run.get("runner_status")
+                    except Exception as exc:
+                        logger.warning(
+                            "Recovery: %s run_state.json unreadable: %s", sim_id, exc
+                        )
+
+                # Decide the new outer status. Map runner states to
+                # outer states; if the runner thinks it's still running
+                # but we're at startup, the process must be dead (new
+                # pod, fresh PID namespace) — mark as INTERRUPTED.
+                new_status: SimulationStatus
+                error_text: str = outer.get("error") or ""
+                if runner_status == "completed":
+                    new_status = SimulationStatus.COMPLETED
+                elif runner_status == "failed":
+                    new_status = SimulationStatus.FAILED
+                    if not error_text:
+                        error_text = "Subprocess exited non-zero (recovered on startup)"
+                elif runner_status == "stopped":
+                    new_status = SimulationStatus.STOPPED
+                else:
+                    # runner_status in (running, starting, stopping, None)
+                    # → process is gone post-restart. Mark interrupted.
+                    new_status = SimulationStatus.INTERRUPTED
+                    if not error_text:
+                        error_text = (
+                            "Backend pod restarted while this simulation was running. "
+                            "The subprocess was killed; partial action log preserved."
+                        )
+
+                # Atomic update: rewrite state.json with the new status.
+                outer["status"] = new_status.value
+                if error_text:
+                    outer["error"] = error_text
+                try:
+                    with open(state_file, "w", encoding="utf-8") as f:
+                        json.dump(outer, f, ensure_ascii=False, indent=2)
+                    reconciled += 1
+                    logger.warning(
+                        "Recovery: reconciled %s outer status %s → %s (runner=%s)",
+                        sim_id, outer_status, new_status.value, runner_status,
+                    )
+                except Exception as exc:
+                    logger.error(
+                        "Recovery: failed to rewrite %s state.json: %s", sim_id, exc
+                    )
+
+            if reconciled:
+                logger.info("Recovery: reconciled %d simulation(s) from disk scan", reconciled)
+    except Exception as exc:
+        logger.warning("Startup recovery (disk scan) failed: %s", exc)
+
+    # ── SurrealDB path (kept for backwards compatibility) ──
     try:
         from .storage.factory import get_storage
         from .storage.surrealdb_backend import SurrealDBStorage
@@ -34,7 +140,7 @@ def _recover_interrupted_simulations(logger):
             sim_id = row.get("simulation_id", "")
             old_pid = row.get("process_pid")
             logger.warning(
-                "Recovering interrupted simulation: %s (pid=%s)", sim_id, old_pid
+                "Recovering interrupted simulation (SurrealDB): %s (pid=%s)", sim_id, old_pid
             )
             try:
                 storage.update_run_state(sim_id, {
@@ -43,15 +149,14 @@ def _recover_interrupted_simulations(logger):
                     "reddit_running": False,
                     "error": f"Process {old_pid} no longer alive on startup",
                 })
-                # Also update the simulation table
                 storage.update_simulation(sim_id, {"status": "interrupted"})
             except Exception as exc:
                 logger.error("Failed to mark simulation %s as interrupted: %s", sim_id, exc)
 
         if interrupted:
-            logger.info("Recovered %d interrupted simulation(s)", len(interrupted))
+            logger.info("Recovered %d interrupted simulation(s) via SurrealDB", len(interrupted))
     except Exception as exc:
-        logger.warning("Startup recovery skipped (SurrealDB unavailable): %s", exc)
+        logger.warning("Startup recovery (SurrealDB) skipped: %s", exc)
 
 
 def create_app(config_class=Config):

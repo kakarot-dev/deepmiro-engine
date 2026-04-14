@@ -3,11 +3,17 @@ backend:
   imagePullPolicy: Always
   port: 5001
   resources:
+    # Bumped from 4Gi → 8Gi after OOMKills during multi-platform sims
+    # with the cached TWHIN-BERT recommender. The model itself sits at
+    # ~1.5 GiB, plus per-agent context (~500 MiB for a 50-agent run),
+    # plus headroom for parallel Twitter+Reddit subprocesses, plus the
+    # OASIS env. 4Gi worked for tiny tests but anything realistic
+    # crashed mid-round and orphaned sims with stale "running" state.
     requests:
-      memory: "2Gi"
+      memory: "4Gi"
       cpu: "1000m"
     limits:
-      memory: "4Gi"
+      memory: "8Gi"
       cpu: "3000m"
 
 mcp:
