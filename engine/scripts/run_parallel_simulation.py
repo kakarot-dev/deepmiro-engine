@@ -1848,7 +1848,57 @@ def setup_signal_handlers(loop=None):
     signal.signal(signal.SIGINT, signal_handler)
 
 
+def _start_parent_death_watchdog():
+    """Exit the subprocess when the backend parent dies.
+
+    Lifecycle guarantee the backend relies on: if the Flask backend
+    process is killed (OOMKill, SIGKILL, container restart), this
+    subprocess must NOT survive and orphan onto PID 1. Otherwise each
+    OOM cycle accumulates more zombie sim runners until the pod hits a
+    terminal memory wall.
+
+    Linux PR_SET_PDEATHSIG looked like the right primitive, but it
+    tracks the fork()-ing THREAD, not the parent process. Flask
+    request handlers die after sending their response, so PDEATHSIG
+    would fire within milliseconds of spawn. Python-level watchdog
+    is portable, thread-model-aware, and has no kernel quirks.
+
+    Runs as a daemon thread so it doesn't block process exit.
+    """
+    import threading as _threading
+    import os as _os
+    import time as _time
+
+    original_ppid = _os.getppid()
+    if original_ppid == 1:
+        # Already orphaned at startup — something is very wrong, just
+        # continue but skip the watchdog so we don't immediately die.
+        return
+
+    def _watch():
+        while True:
+            _time.sleep(2)
+            try:
+                current_ppid = _os.getppid()
+            except OSError:
+                continue
+            if current_ppid != original_ppid:
+                # Parent died; we've been reparented (usually to PID 1).
+                # Flush stdout so the "backend parent died" line makes
+                # it into simulation.log before we exit.
+                print(
+                    f"[watchdog] backend parent pid={original_ppid} "
+                    f"died; subprocess exiting cleanly",
+                    flush=True,
+                )
+                _os._exit(0)
+
+    t = _threading.Thread(target=_watch, name="parent-death-watchdog", daemon=True)
+    t.start()
+
+
 if __name__ == "__main__":
+    _start_parent_death_watchdog()
     setup_signal_handlers()
     try:
         asyncio.run(main())

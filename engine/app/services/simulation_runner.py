@@ -512,42 +512,26 @@ class SimulationRunner:
             
             # Spawn the sim subprocess. Two lifecycle guarantees matter:
             #
-            # 1. We need our own process group so that explicit stop
-            #    (os.killpg) can terminate the whole tree. That's what
-            #    start_new_session=True gives us.
+            # 1. We need our own process group so explicit stop
+            #    (os.killpg) can terminate the whole tree —
+            #    start_new_session=True gives us that.
             #
             # 2. If the backend Python process dies unexpectedly (OOM,
-            #    SIGKILL, container restart), the kernel should kill the
-            #    subprocess too — otherwise it orphans onto PID 1 and
-            #    keeps consuming RAM. In a containerized setup we've
-            #    seen 8+ orphaned sim subprocesses accumulate across OOM
-            #    cycles, each using ~1.5 GB, forcing runaway OOMs.
+            #    SIGKILL), the subprocess should not survive — otherwise
+            #    it orphans onto PID 1 and keeps consuming RAM.
             #
-            #    Linux prctl(PR_SET_PDEATHSIG, SIGTERM) tells the kernel
-            #    to send SIGTERM to this process as soon as its parent
-            #    dies — exactly what we want. But it interacts with (1):
-            #    start_new_session puts the child in its own session,
-            #    and the kernel resets PDEATHSIG on setsid(). So we have
-            #    to call prctl AFTER setsid. That means doing both in a
-            #    preexec_fn (child-side), not passing start_new_session
-            #    as a kwarg.
-            import ctypes as _ctypes
-            _PR_SET_PDEATHSIG = 1
-
-            def _child_preexec() -> None:
-                # Runs in the child between fork and execvp.
-                try:
-                    os.setsid()  # new session (replaces start_new_session=True)
-                except OSError:
-                    pass
-                if sys.platform.startswith("linux"):
-                    try:
-                        libc = _ctypes.CDLL("libc.so.6", use_errno=True)
-                        # SIGTERM = 15 on Linux
-                        libc.prctl(_PR_SET_PDEATHSIG, 15, 0, 0, 0)
-                    except Exception:
-                        pass
-
+            # We used to try prctl(PR_SET_PDEATHSIG) here, but that
+            # tracks the fork()-ing THREAD, not the process. Flask
+            # request handler threads die as soon as the HTTP response
+            # is sent, which made the kernel SIGTERM the subprocess a
+            # few milliseconds after spawn. That's way too eager.
+            #
+            # Instead, the child subprocess runs its own Python-level
+            # parent-death watchdog — see
+            # engine/scripts/run_parallel_simulation.py _start_parent_
+            # death_watchdog(). It polls os.getppid() every 2 s and
+            # exits cleanly once the backend process disappears. Same
+            # OOM coverage, no thread-level misfires.
             process = subprocess.Popen(
                 cmd,
                 cwd=sim_dir,
@@ -557,7 +541,7 @@ class SimulationRunner:
                 encoding='utf-8',
                 bufsize=1,
                 env=env,
-                preexec_fn=_child_preexec,
+                start_new_session=True,
             )
             
             # 保存文件句柄以便后续关闭
