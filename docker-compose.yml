@@ -107,7 +107,13 @@ services:
       SURREAL_NAMESPACE: ${SURREAL_NAMESPACE:-mirofish}
       SURREAL_DATABASE: ${SURREAL_DATABASE:-production}
       SURREAL_USER: ${SURREAL_USER:-root}
-      SURREAL_PASSWORD: ${SURREAL_PASSWORD:-changeme}
+      # No default here — the surrealdb service above already enforces
+      # this via ${SURREAL_PASSWORD:?...}, so by the time Compose
+      # reaches the backend, the variable is guaranteed to be set.
+      # A `:-changeme` default here would cause a silent mismatch
+      # between the DB root password and what the backend connects
+      # with if anyone ever bypassed the surrealdb guard.
+      SURREAL_PASSWORD: ${SURREAL_PASSWORD}
 
       # ── Primary LLM (required) ──
       LLM_API_KEY: ${LLM_API_KEY}
@@ -134,8 +140,20 @@ services:
       # ── Flask server ──
       FLASK_HOST: 0.0.0.0
       FLASK_PORT: "5001"
-    ports:
-      - "${BACKEND_PORT:-5001}:5001"
+    # Backend is internal-only by default. MCP is the public entry
+    # point (see the mcp service below) and proxies to the backend
+    # inside the compose network. The REST API is reachable on the
+    # internal DNS name `backend:5001` but NOT on the host.
+    #
+    # If you want direct host-level access to the REST API — e.g.
+    # for dashboards, custom clients, or curl-based testing without
+    # the MCP layer — uncomment the ports: block below. On a
+    # public VPS or Railway deployment, leaving it internal is the
+    # safer default because the REST API has no built-in auth.
+    expose:
+      - "5001"
+    # ports:
+    #   - "${BACKEND_PORT:-5001}:5001"
     volumes:
       - uploads:/app/deepmiro/engine/uploads
     depends_on:
@@ -159,13 +177,21 @@ services:
       start_period: 45s
 
   # ──────────────────────────────────────────────────────────────────
-  # MCP server (optional)
+  # MCP server — THE PUBLIC ENTRY POINT
   #
   # Exposes the backend as a Model Context Protocol server so AI
   # clients (Claude Desktop, Cursor, VS Code Copilot, etc.) can call
   # create_simulation / get_report / interview_agent directly.
   #
-  # Skip this service entirely if you're only using the REST API.
+  # On a Railway deployment, this is the port you want Railway to
+  # proxy with TLS — NOT the backend's port 5001. The backend is
+  # reachable internally via the `backend` service name and is
+  # intentionally not published on the host (see the `expose:`
+  # block on the backend service above).
+  #
+  # To disable MCP entirely and use only the REST API, delete this
+  # whole service block and uncomment the `ports:` block on the
+  # backend service above.
   # ──────────────────────────────────────────────────────────────────
   mcp:
     image: ghcr.io/kakarot-dev/deepmiro-mcp:latest

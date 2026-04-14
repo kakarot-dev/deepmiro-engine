@@ -10,8 +10,14 @@ Feed it a document. Describe a scenario. Watch hundreds of AI agents with distin
 
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=flat-square)](./LICENSE)
 [![npm](https://img.shields.io/npm/v/deepmiro-mcp?style=flat-square&label=npm&color=22d3ee)](https://www.npmjs.com/package/deepmiro-mcp)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](#self-host)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](#rehearse-the-future-in-60-seconds)
 [![Website](https://img.shields.io/badge/deepmiro.org-live-22d3ee?style=flat-square)](https://deepmiro.org)
+
+<br/>
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/98AO1I?referralCode=pYCUQd&utm_medium=integration&utm_source=template&utm_campaign=generic)
+
+<sub>One-click self-host — four services, one API key, ~60 seconds. <a href="#rehearse-the-future-in-60-seconds">Full walkthrough ↓</a></sub>
 
 </div>
 
@@ -70,30 +76,75 @@ Then restart Claude Code and say `/predict` or `predict how people will react to
 | **Cursor / Windsurf** | Settings → MCP → Add → `npx deepmiro-mcp` with env `DEEPMIRO_API_KEY` |
 | **VS Code (Copilot)** | Add to `.vscode/mcp.json`: `"deepmiro": {"command": "npx", "args": ["-y", "deepmiro-mcp"], "env": {"DEEPMIRO_API_KEY": "dm_xxx"}}` |
 
-### Self-host
+## Rehearse the Future in 60 Seconds
 
-No API key needed. Run the engine locally and point the MCP server at it:
+<sub>Self-host · Railway template · pure Docker Compose</sub>
+
+DeepMiro runs as four small services that fit on one box. The easiest way to get your own instance up is the Railway one-click template — but the same compose file works on any Linux machine with Docker.
+
+### What gets deployed
+
+| Service | What it does |
+|---|---|
+| **backend** | Flask engine that runs the OASIS multi-agent simulations |
+| **mcp** | The public entry point your AI tools talk to (Claude Desktop, Cursor, VS Code, etc.) |
+| **twhin-sidecar** | Pod-scoped TWHIN-BERT embedding service shared by every sim subprocess (loads the model once instead of once-per-sim) |
+| **surrealdb** | Graph + vector + document store for agents, posts, reports, and agent memory |
+
+### What you need first
+
+- A **Fireworks AI** API key ([fireworks.ai](https://fireworks.ai) — ~$5 free credit, then pennies per sim). Any OpenAI-compatible API works — OpenAI, Together, Groq, Ollama, LM Studio, vLLM — but Fireworks is the default because one key covers the primary LLM, the reasoning boost model, **and** graph embeddings with zero extra config.
+- A strong SurrealDB root password: `openssl rand -hex 32`
+- ~$5–10/month of Railway credit if you're using the template (Hobby plan minimum — the TWHIN sidecar is memory-hungry)
+
+### Railway (one click)
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/98AO1I?referralCode=pYCUQd&utm_medium=integration&utm_source=template&utm_campaign=generic)
+
+Click it. Railway reads `docker-compose.yml` at the repo root, spins up all four services, and prompts you for `LLM_API_KEY` and `SURREAL_PASSWORD`. The MCP service gets a public `*.up.railway.app` URL — that's the one you hand to your AI tools.
+
+### Docker Compose on your own box
 
 ```bash
 git clone https://github.com/kakarot-dev/deepmiro.git
 cd deepmiro
-cp .env.example .env    # add your LLM API key
-docker compose -f docker/docker-compose.yml up -d
-
-# Connect your AI client to the local engine
-claude mcp add deepmiro -e MIROFISH_URL=http://localhost:5001 -- npx -y deepmiro-mcp
+cp .env.example .env
+# Edit .env — set LLM_API_KEY (Fireworks or any OpenAI-compatible key)
+# and SURREAL_PASSWORD (openssl rand -hex 32)
+docker compose up -d
 ```
 
-```env
-# Required in .env
-LLM_API_KEY=your_key
-LLM_BASE_URL=https://api.openai.com/v1
-LLM_MODEL_NAME=gpt-4o-mini
+Compose will refuse to start if either required variable is missing — no silent `changeme` defaults. The MCP server is exposed on `http://localhost:3001` by default; the backend REST API and SurrealDB are kept internal to the compose network.
 
-SURREALDB_URL=ws://localhost:8000/rpc
-SURREALDB_USER=root
-SURREALDB_PASS=root
+### Point your AI tool at it
+
+Once the MCP service is up — either at `https://your-app.up.railway.app/mcp` (Railway) or `http://localhost:3001/mcp` (local) — wire it into any MCP client:
+
+**Claude Desktop / Claude Code:**
+
+```json
+{
+  "mcpServers": {
+    "deepmiro": {
+      "url": "https://your-mcp-url.up.railway.app/mcp"
+    }
+  }
+}
 ```
+
+Then ask in plain language: *"Use DeepMiro to simulate how 100 senior engineers would react to this RFC about mandatory return-to-office"* — and paste the doc. You'll get a multi-section prediction report with direct quotes from dissenting agents, grouped by faction.
+
+### What a run actually costs
+
+- **Railway:** ~$5–10/month of compute (four services, ~4 GB resident) + storage for simulation logs
+- **LLM tokens:** ~$0.10–0.20 per quick-preset simulation on Fireworks (15 agents, ~20-50k tokens of inference + boost model for report generation)
+- **TWHIN-BERT:** runs locally inside the sidecar, zero API cost, zero per-sim cost
+
+### Security
+
+The MCP server defaults to **no auth** — fine for localhost, but if you expose it on the public internet, set `MCP_API_KEY` in your `.env` so clients have to send an `Authorization: Bearer …` header. Same for the backend REST API, which is internal-only by default in `docker-compose.yml` and only becomes reachable if you explicitly uncomment its `ports:` block.
+
+> **Skip the deploy entirely?** We run a hosted version at **[deepmiro.org](https://deepmiro.org)** — sign up for a `dm_…` key and get simulations without touching Docker. Same engine, same models, same plugin install commands below.
 
 ## MCP Server
 
