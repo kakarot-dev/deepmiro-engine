@@ -1,0 +1,45 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# System deps for compiling tokenizers wheels (rust extensions in some
+# transformer versions). Removed after install to keep the image lean.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl build-essential && \
+    rm -rf /var/lib/apt/lists/*
+
+# uv for fast pip
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
+
+# Copy sidecar source
+COPY twhin-sidecar/ /app/twhin-sidecar/
+
+WORKDIR /app/twhin-sidecar
+
+# Install deps. Two key choices:
+#   1) CPU-only torch wheel from the official PyTorch CPU index. Saves
+#      ~1.8 GB vs the default CUDA wheel since jenny has no GPU.
+#   2) The model is downloaded at first /healthz call, NOT baked into
+#      the image. That keeps the image to ~700 MB; the model lives
+#      inside the running container's HF cache (~1.5 GB at runtime).
+RUN uv venv .venv && \
+    . .venv/bin/activate && \
+    uv pip install --index-strategy unsafe-best-match \
+        --extra-index-url https://download.pytorch.org/whl/cpu \
+        torch && \
+    uv pip install -e .
+
+ENV PATH="/app/twhin-sidecar/.venv/bin:$PATH"
+
+# Pre-warm the model into the image's HF cache layer so the first
+# pod start is fast. This ADDs ~1.5 GB to the image but cuts
+# cold-start from ~30s (download) → ~5s (load from disk).
+ENV HF_HOME=/app/twhin-sidecar/.hf-cache
+RUN python -c "from transformers import AutoModel, AutoTokenizer; \
+    AutoTokenizer.from_pretrained('Twitter/twhin-bert-base', model_max_length=512); \
+    AutoModel.from_pretrained('Twitter/twhin-bert-base')"
+
+EXPOSE 7001
+
+CMD ["uvicorn", "twhin_sidecar.main:app", "--host", "0.0.0.0", "--port", "7001"]

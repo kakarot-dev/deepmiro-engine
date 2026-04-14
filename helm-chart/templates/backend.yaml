@@ -89,6 +89,10 @@ spec:
           value: "0.0.0.0"
         - name: FLASK_PORT
           value: {{ .Values.backend.port | quote }}
+        # Sim subprocesses use this URL to call the in-pod TWHIN-BERT
+        # sidecar instead of loading the model into their own RSS.
+        - name: TWHIN_URL
+          value: "http://localhost:{{ .Values.twhinSidecar.port }}"
         resources:
           {{- toYaml .Values.backend.resources | nindent 10 }}
         volumeMounts:
@@ -106,6 +110,41 @@ spec:
             port: {{ .Values.backend.port }}
           initialDelaySeconds: 15
           periodSeconds: 10
+      # ── TWHIN-BERT embedding sidecar ──
+      # Loads Twitter/twhin-bert-base exactly once per pod and serves
+      # the cached recommender. Same-pod containers share localhost,
+      # so the backend (and its sim subprocesses) reach it via
+      # http://localhost:7001 with no service / DNS hop.
+      - name: twhin-sidecar
+        image: {{ .Values.twhinSidecar.image }}
+        imagePullPolicy: {{ .Values.twhinSidecar.imagePullPolicy | default "IfNotPresent" }}
+        ports:
+        - containerPort: {{ .Values.twhinSidecar.port }}
+        env:
+        - name: LOG_LEVEL
+          value: "INFO"
+        resources:
+          {{- toYaml .Values.twhinSidecar.resources | nindent 10 }}
+        # Model load takes 5-15s on cold start, so the readiness probe
+        # waits up to 60s before the sidecar is marked ready. Backend
+        # sim subprocesses retry the embed call on connection refused
+        # (see engine/scripts/twhin_rec.py startup retry loop), so a
+        # delayed sidecar won't crash a sim — it'll fall back to the
+        # "recent posts" recommender path until ready.
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: {{ .Values.twhinSidecar.port }}
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: {{ .Values.twhinSidecar.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 12
       volumes:
       - name: uploads
         persistentVolumeClaim:

@@ -15,6 +15,25 @@ services:
       timeout: 10s
       retries: 3
 
+  twhin-sidecar:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.twhin-sidecar
+    container_name: deepmiro-twhin-sidecar
+    # Pod-scoped TWHIN-BERT embedding service. Loaded once and shared
+    # by all sim subprocesses spawned by deepmiro-backend below.
+    # Internal-only — not exposed on the host network.
+    expose:
+      - "7001"
+    restart: unless-stopped
+    mem_limit: 2500m
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:7001/healthz', timeout=2)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
   deepmiro-backend:
     build:
       context: ..
@@ -41,12 +60,17 @@ services:
       FLASK_HOST: 0.0.0.0
       FLASK_PORT: "5001"
       ZEP_API_KEY: surreal-mode
+      # Sim subprocesses use this URL to call the TWHIN sidecar
+      # instead of loading the model into their own RSS.
+      TWHIN_URL: http://twhin-sidecar:7001
     ports:
       - "5001:5001"
     volumes:
       - uploads:/app/backend/uploads
     depends_on:
       surrealdb:
+        condition: service_healthy
+      twhin-sidecar:
         condition: service_healthy
     restart: unless-stopped
 

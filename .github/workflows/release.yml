@@ -10,6 +10,7 @@ jobs:
     outputs:
       engine: ${{ steps.filter.outputs.engine }}
       mcp: ${{ steps.filter.outputs.mcp }}
+      twhin: ${{ steps.filter.outputs.twhin }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -19,16 +20,21 @@ jobs:
           CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
           echo "engine=false" >> "$GITHUB_OUTPUT"
           echo "mcp=false" >> "$GITHUB_OUTPUT"
+          echo "twhin=false" >> "$GITHUB_OUTPUT"
           if echo "$CHANGED" | grep -qE '^(engine/|docker/Dockerfile\.backend)'; then
             echo "engine=true" >> "$GITHUB_OUTPUT"
           fi
           if echo "$CHANGED" | grep -qE '^(mcp-server/|docker/Dockerfile$)'; then
             echo "mcp=true" >> "$GITHUB_OUTPUT"
           fi
-          # If nothing matched (e.g. shared files, helm, etc.), rebuild both
-          if ! echo "$CHANGED" | grep -qE '^(engine/|mcp-server/|docker/)'; then
+          if echo "$CHANGED" | grep -qE '^(twhin-sidecar/|docker/Dockerfile\.twhin-sidecar)'; then
+            echo "twhin=true" >> "$GITHUB_OUTPUT"
+          fi
+          # If nothing matched (e.g. shared files, helm, etc.), rebuild all three
+          if ! echo "$CHANGED" | grep -qE '^(engine/|mcp-server/|twhin-sidecar/|docker/)'; then
             echo "engine=true" >> "$GITHUB_OUTPUT"
             echo "mcp=true" >> "$GITHUB_OUTPUT"
+            echo "twhin=true" >> "$GITHUB_OUTPUT"
           fi
 
   build-and-push:
@@ -48,6 +54,10 @@ jobs:
             file: docker/Dockerfile
             image: deepmiro-mcp
             changed: ${{ needs.changes.outputs.mcp }}
+          - name: twhin-sidecar
+            file: docker/Dockerfile.twhin-sidecar
+            image: deepmiro-twhin-sidecar
+            changed: ${{ needs.changes.outputs.twhin }}
     steps:
       - if: matrix.changed == 'true'
         uses: actions/checkout@v4
