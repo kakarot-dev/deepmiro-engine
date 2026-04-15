@@ -107,6 +107,8 @@ Four services, one compose file, one API key.
 
 Railway reads `docker-compose.yml` from the repo root and prompts for `LLM_API_KEY` + `SURREAL_PASSWORD`. The MCP service gets a public `*.up.railway.app` URL — hand that to your AI tools.
 
+> **Note — LLM provider on Railway.** The template ships with **Fireworks** as the default (primary: `minimax-m2p5`, boost: `gpt-oss-120b`, embeddings: `nomic-embed-text-v1.5` — one key covers all three). Any OpenAI-compatible API works — to swap to OpenAI, Together, Groq, Ollama, vLLM, or anything else, change `LLM_BASE_URL` and `LLM_MODEL_NAME` on the backend service's Variables tab after deploy. Same for `LLM_BOOST_*` if you want a separate reasoning model, and `EMBEDDING_*` if you want a different embedding provider.
+
 <br/>
 
 ### Option B — Your own box
