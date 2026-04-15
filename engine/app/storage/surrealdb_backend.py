@@ -30,6 +30,15 @@ class SurrealDBStorage(GraphStorage):
     MAX_RETRIES = 3
     RETRY_DELAY_BASE = 1  # seconds, exponential backoff
 
+    # Class-level cache of URLs that have already had their schema
+    # applied. The schema is idempotent (DEFINE TABLE IF NOT EXISTS
+    # semantics), but re-firing ~30 queries every time a background
+    # thread opens a new connection is wasteful — the monitor thread
+    # creates a fresh storage per 2-second save cycle during an
+    # active sim, which meant every sim was re-applying the full
+    # schema 30 times per minute. Once per URL per process is enough.
+    _schema_applied: set = set()
+
     def __init__(
         self,
         url: Optional[str] = None,
@@ -69,13 +78,30 @@ class SurrealDBStorage(GraphStorage):
             self._db.__enter__()
         self._db.use(self._namespace, self._database)
         self._db.signin({"username": self._user, "password": self._password})
-        self._ensure_schema()
-        logger.info(
-            "Connected to SurrealDB at %s (ns=%s, db=%s)",
-            self._url,
-            self._namespace,
-            self._database,
-        )
+
+        # Only apply the schema once per URL per process. The actual
+        # schema is idempotent but the ~30 DEFINE queries add up when
+        # background-thread saves open a new connection every few
+        # seconds. First-time connects do the full schema dance;
+        # subsequent connects skip straight to ready.
+        cache_key = f"{self._url}/{self._namespace}/{self._database}"
+        if cache_key not in SurrealDBStorage._schema_applied:
+            self._ensure_schema()
+            SurrealDBStorage._schema_applied.add(cache_key)
+            logger.info(
+                "Connected to SurrealDB at %s (ns=%s, db=%s) — schema applied",
+                self._url,
+                self._namespace,
+                self._database,
+            )
+        else:
+            # Subsequent connects (bg-thread saves) log at debug so
+            # they don't flood production logs. One INFO line per
+            # process is enough.
+            logger.debug(
+                "Reconnected to SurrealDB at %s (bg thread, schema cached)",
+                self._url,
+            )
 
     def close(self) -> None:
         """Close the SurrealDB connection."""
