@@ -36,10 +36,26 @@ services:
     # Railway / Render / Fly with an unset var will fail loudly
     # here rather than start a DB with root:changeme open on an
     # internal URL.
+    #
+    # The environment: block is load-bearing for Railway. Railway
+    # imports compose and creates one service variable per env
+    # entry. Without this block, Railway would create the surrealdb
+    # service with ZERO variables, and a backend reference like
+    # ${{surrealdb.SURREAL_PASSWORD}} would resolve to empty string
+    # because there's nothing named that on the surrealdb service.
+    # Declaring it here gives Railway a variable to expose and
+    # cross-reference, while still feeding the compose `command:`
+    # interpolation below.
+    environment:
+      SURREAL_USER: ${SURREAL_USER:-root}
+      SURREAL_PASSWORD: ${SURREAL_PASSWORD:?SURREAL_PASSWORD is required — set a strong value in .env or Railway Variables}
+    # Command uses compose-level ${VAR} interpolation (substituted at
+    # parse time), NOT shell expansion — the surrealdb/surrealdb:latest
+    # image is distroless and has no /bin/sh to expand $VAR at runtime.
     command: >
       start
       --user ${SURREAL_USER:-root}
-      --pass ${SURREAL_PASSWORD:?SURREAL_PASSWORD is required — set a strong value in .env}
+      --pass ${SURREAL_PASSWORD}
       --bind 0.0.0.0:8000
       --log warn
       -A surrealkv:/data/deepmiro.db
