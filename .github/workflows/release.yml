@@ -79,6 +79,32 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:latest
             ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ github.ref_name }}
 
+  desktop-extension:
+    needs: changes
+    if: needs.changes.outputs.mcp == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build MCP server + pack .mcpb
+        working-directory: mcp-server
+        run: |
+          npm ci
+          npm run build
+          npm install -g @anthropic-ai/mcpb
+          cp ../static/image/deepmiro-lockup.png icon.png
+          mcpb pack
+          mv *.mcpb deepmiro.mcpb
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: mcp-server/deepmiro.mcpb
+          tag_name: ${{ github.ref_name }}
+
   publish-mcp-registry:
     needs: changes
     if: needs.changes.outputs.mcp == 'true'

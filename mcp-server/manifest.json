@@ -1,0 +1,34 @@
+{
+  "manifest_version": "0.3",
+  "name": "deepmiro",
+  "version": "0.2.12",
+  "description": "Swarm prediction engine — simulate how communities react to events, policies, and announcements.",
+  "author": {
+    "name": "kakarot-dev",
+    "url": "https://deepmiro.org"
+  },
+  "homepage": "https://deepmiro.org",
+  "license": "AGPL-3.0",
+  "icon": "icon.png",
+  "user_config": {
+    "api_key": {
+      "type": "string",
+      "title": "DeepMiro API Key",
+      "description": "Get your key at deepmiro.org/dashboard",
+      "sensitive": true,
+      "required": true
+    }
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js"],
+      "env": {
+        "TRANSPORT": "stdio",
+        "DEEPMIRO_API_KEY": "${user_config.api_key}"
+      }
+    }
+  }
+}
