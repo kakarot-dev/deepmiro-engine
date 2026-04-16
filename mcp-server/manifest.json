@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.3",
   "name": "deepmiro",
-  "version": "0.2.13",
+  "version": "0.2.15",
   "description": "Swarm prediction engine — simulate how communities react to events, policies, and announcements.",
   "author": {
     "name": "kakarot-dev",
@@ -21,7 +21,8 @@
     "server_url": {
       "type": "string",
       "title": "DeepMiro Server URL",
-      "description": "Default: hosted API. Change only if self-hosting (e.g. http://localhost:5001)",
+      "description": "Leave as default unless self-hosting (e.g. http://localhost:5001)",
+      "default": "https://api.deepmiro.org",
       "required": false
     }
   },
