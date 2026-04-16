@@ -105,30 +105,6 @@ If a file path is in $ARGUMENTS or the user referenced a file:
 
 No file? Skip to Step 3.
 
-### Step 2.5: Enrich the prompt (IMPORTANT — do this for every prediction)
-
-Before sending the prompt to DeepMiro, YOU must enrich it. The simulation engine extracts named entities from the prompt to create personas. A vague prompt like "how will people react to X" produces zero personas.
-
-**Your job:** Rewrite the user's prompt into a rich scenario description that includes:
-- **Specific stakeholder groups** with descriptive names (not just "people")
-- **Named organizations** that would be involved
-- **The context** — what happened, when, why it matters
-- **Opposing viewpoints** — who supports, who opposes, who's neutral
-
-**Example:**
-User says: "How will crypto affect government record keeping?"
-
-You rewrite to: "A major US government agency announces it will pilot blockchain-based record keeping for land titles and tax records. Key stakeholders include: the Government Accountability Office (GAO), the National Institute of Standards and Technology (NIST), the American Bankers Association, Coinbase and Ethereum Foundation as blockchain advocates, the Electronic Frontier Foundation (EFF) representing privacy concerns, state-level IT directors from Texas and California, taxpayer advocacy groups, and investigative journalists from The Washington Post and Wired. The debate centers on transparency vs privacy, cost savings vs implementation risk, and innovation vs proven systems."
-
-**Show the user what you changed:**
-> "Your prompt was a bit broad for the simulation engine — I've added some context to help it create better personas. Here's what I'm sending:
->
-> *[show the enriched prompt]*
->
-> Want me to adjust anything before I run it?"
-
-Wait for confirmation, then proceed. Do NOT list specific personas — the engine decides who to create based on the text.
-
 ### Step 3: Choose preset
 
 - **"quick"** — user said "quick", "fast", "rough idea" → 10 agents, 20 rounds

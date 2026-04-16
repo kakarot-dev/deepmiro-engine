@@ -33,9 +33,11 @@ export function registerCreateSimulation(server: McpServer, client: MirofishClie
     {
       title: "Create Simulation",
       description:
-        "Run a full swarm prediction. Builds a knowledge graph, generates agent personas, " +
-        "runs a multi-agent social media simulation, and generates a prediction report. " +
-        "Streams progress updates. Returns the final report when complete.",
+        "Run a swarm prediction — graph build, persona generation, multi-agent simulation, report.\n\n" +
+        "IMPORTANT: Enrich the prompt before calling. The engine extracts named entities to create personas. " +
+        "Add specific people, companies, organizations, and opposing viewpoints. Show the enriched prompt " +
+        "to the user for confirmation first.\n\n" +
+        "After creation, poll simulation_status every 30s. When complete, call get_report.",
       inputSchema,
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
