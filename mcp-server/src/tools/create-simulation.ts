@@ -37,6 +37,7 @@ export function registerCreateSimulation(server: McpServer, client: MirofishClie
         "IMPORTANT: Enrich the prompt before calling. The engine extracts named entities to create personas. " +
         "Add specific people, companies, organizations, and opposing viewpoints. Show the enriched prompt " +
         "to the user for confirmation first.\n\n" +
+        "If the user provides a document (PDF, MD, TXT), call upload_document first and pass the returned document_id.\n\n" +
         "After creation, poll simulation_status every 30s. When complete, call get_report.",
       inputSchema,
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
