@@ -162,7 +162,14 @@ MCP lives on `http://localhost:3001`. Backend and SurrealDB stay internal to the
 
 <br/>
 
-### Wire it into Claude
+### Wire it into Claude Desktop
+
+Add DeepMiro to your Claude Desktop config file:
+
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+For a local Docker deployment:
 
 ```json
 {
@@ -172,7 +179,7 @@ MCP lives on `http://localhost:3001`. Backend and SurrealDB stay internal to the
 }
 ```
 
-For Railway or any public deployment, replace with your `*.up.railway.app` URL:
+For Railway or any public deployment:
 
 ```json
 {
@@ -182,7 +189,7 @@ For Railway or any public deployment, replace with your `*.up.railway.app` URL:
 }
 ```
 
-Then ask: *"Use DeepMiro to simulate how 100 senior engineers would react to a return-to-office mandate"* — and paste the memo.
+Restart Claude Desktop after editing. Then ask: *"Use DeepMiro to simulate how 100 senior engineers would react to a return-to-office mandate"* — and paste the memo.
 
 <br/>
 
