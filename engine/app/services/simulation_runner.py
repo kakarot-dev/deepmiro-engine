@@ -771,6 +771,15 @@ class SimulationRunner:
                                         state.runner_status = RunnerStatus.COMPLETED
                                         state.completed_at = datetime.now().isoformat()
                                         logger.info(f"所有平台模拟已完成: {state.simulation_id}")
+                                        # Propagate to outer Simulation state so MCP/UI
+                                        # see status=completed even though the subprocess
+                                        # is still alive (waiting for commands by default).
+                                        # Without this, simulation_status stays at
+                                        # phase=simulating progress=100% forever.
+                                        try:
+                                            cls._mark_outer_simulation_completed(state.simulation_id)
+                                        except Exception as e:
+                                            logger.warning(f"Failed to mark outer sim completed: {e}")
                                 
                                 # 更新轮次信息（从 round_end 事件）
                                 elif event_type == "round_end":
