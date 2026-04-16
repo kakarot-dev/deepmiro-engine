@@ -111,20 +111,68 @@ Railway reads `docker-compose.yml` from the repo root and prompts for `LLM_API_K
 
 <br/>
 
-### Option B — Your own box
+### Option B — Docker (self-hosted)
 
 ```bash
 git clone https://github.com/kakarot-dev/deepmiro.git
 cd deepmiro && cp .env.example .env
-# edit .env → LLM_API_KEY + SURREAL_PASSWORD
+```
+
+Edit `.env` — two required variables:
+
+```bash
+LLM_API_KEY=your-fireworks-or-openai-key
+SURREAL_PASS=$(openssl rand -hex 32)
+```
+
+Start everything:
+
+```bash
 docker compose up -d
 ```
 
-MCP lives on `http://localhost:3001`. Backend and SurrealDB stay internal to the compose network unless you explicitly publish them.
+This pulls pre-built images from GHCR and starts four services:
+
+| Service | Port | Description |
+|---|---|---|
+| `mcp` | 3001 (public) | MCP server — the only exposed port |
+| `backend` | 5001 (internal) | Flask simulation engine |
+| `surrealdb` | 8000 (internal) | Graph + vector store |
+| `twhin-sidecar` | 7001 (internal) | Shared TWHIN-BERT embeddings |
+
+First startup takes ~2 minutes (TWHIN-BERT model warm-up). Check readiness:
+
+```bash
+docker compose logs -f twhin-sidecar   # wait for "TWHIN-BERT ready"
+docker compose logs backend            # wait for "MiroFish Backend 启动完成"
+```
+
+To build from source instead of pulling images:
+
+```bash
+docker compose -f docker-compose.yml \
+  --build \
+  -f docker/Dockerfile.backend \
+  up -d
+```
+
+Or uncomment the `build:` blocks in `docker-compose.yml` and comment out the `image:` lines.
+
+MCP lives on `http://localhost:3001`. Backend and SurrealDB stay internal to the compose network unless you explicitly publish them (see `docker-compose.yml` comments for how).
 
 <br/>
 
 ### Wire it into Claude
+
+```json
+{
+  "mcpServers": {
+    "deepmiro": { "url": "http://localhost:3001/mcp" }
+  }
+}
+```
+
+For Railway or any public deployment, replace with your `*.up.railway.app` URL:
 
 ```json
 {
