@@ -509,6 +509,7 @@ class SimulationRunner:
             env = os.environ.copy()
             env['PYTHONUTF8'] = '1'  # Python 3.7+ 支持，让所有 open() 默认使用 UTF-8
             env['PYTHONIOENCODING'] = 'utf-8'  # 确保 stdout/stderr 使用 UTF-8
+            env['PYTHONUNBUFFERED'] = '1'  # Flush stdout/stderr immediately so the log tee sees output in real time
             
             # Spawn the sim subprocess. Two lifecycle guarantees matter:
             #
