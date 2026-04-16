@@ -167,6 +167,24 @@ try:
 except ImportError:
     pass
 
+# ── Block OASIS from loading Twitter/twhin-bert-base at import time ──
+# OASIS's recsys module loads the 1.5 GB TWHIN-BERT model into the
+# subprocess on first import.  We serve the same model from a shared
+# sidecar container over HTTP, so the local load is pure waste — and
+# on memory-constrained hosts like Railway it hangs the subprocess.
+#
+# Patching the global model cache to a sentinel BEFORE importing oasis
+# prevents rec_sys_personalized_twh() from ever calling
+# get_recsys_model().  Our create_twhin_rec_updater() replaces
+# update_rec_table() before env.reset(), so the patched globals are
+# never actually used.
+try:
+    import oasis.social_platform.recsys as _recsys_mod
+    _recsys_mod.twhin_model = "SIDECAR"      # truthy → skip load
+    _recsys_mod.twhin_tokenizer = "SIDECAR"   # truthy → skip load
+except Exception:
+    pass
+
 try:
     from camel.models import ModelFactory
     from camel.types import ModelPlatformType
