@@ -10,7 +10,17 @@ import { toMcpError } from "../errors/index.js";
 const inputSchema = {
   simulation_id: z.string().describe("The simulation ID returned by create_simulation"),
   detailed: z.coerce.boolean().optional().describe("Include recent agent actions with content in the response"),
+  wait: z.coerce.boolean().optional().describe("Long-poll: block up to 50s waiting for the next state change. Default true. Set false for an immediate snapshot."),
 };
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Snapshot of state we use to detect "interesting" changes during long-poll */
+function snapshotKey(s: { phase?: string; current_round?: number; total_actions?: number; report_status?: string }): string {
+  return `${s.phase ?? ""}|${s.current_round ?? 0}|${s.total_actions ?? 0}|${s.report_status ?? ""}`;
+}
 
 /** Extract content from action_args for content-producing actions */
 function extractContent(action: AgentAction): string | undefined {
@@ -25,15 +35,45 @@ export function registerSimulationStatus(server: McpServer, client: MirofishClie
     {
       title: "Simulation Status",
       description:
-        "Check the progress of a running or completed simulation. " +
-        "Returns phase-aware status with entity names and action content. " +
+        "Check the progress of a running or completed simulation. Long-polls by default — blocks up to 50s waiting for a state change " +
+        "(phase transition, new actions, completion). Returns immediately if state has changed since last poll. " +
+        "When phase=completed, includes the full prediction report inline. " +
         "Phases: building_graph → generating_profiles → simulating → completed.",
       inputSchema,
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     },
     async (args) => {
       try {
-        const result = await resolveStatus(client, args.simulation_id, args.detailed ?? false);
+        const wait = args.wait !== false; // default true
+        const detailed = args.detailed ?? false;
+
+        // Long-poll: snapshot, then wait for changes (up to ~50s, under Claude Desktop's 60s timeout)
+        if (wait) {
+          const initial = await resolveStatus(client, args.simulation_id, detailed);
+          // Terminal states return immediately
+          if (initial.phase === "completed" || initial.phase === "failed") {
+            return { content: [{ type: "text" as const, text: JSON.stringify(initial, null, 2) }] };
+          }
+          const initialKey = snapshotKey(initial);
+          const POLL_INTERVAL_MS = 3_000;
+          const MAX_WAIT_MS = 50_000;
+          const start = Date.now();
+          while (Date.now() - start < MAX_WAIT_MS) {
+            await sleep(POLL_INTERVAL_MS);
+            const current = await resolveStatus(client, args.simulation_id, detailed);
+            if (snapshotKey(current) !== initialKey ||
+                current.phase === "completed" ||
+                current.phase === "failed") {
+              return { content: [{ type: "text" as const, text: JSON.stringify(current, null, 2) }] };
+            }
+          }
+          // Timed out — return current state so Claude knows we're alive
+          const final = await resolveStatus(client, args.simulation_id, detailed);
+          return { content: [{ type: "text" as const, text: JSON.stringify(final, null, 2) }] };
+        }
+
+        // Immediate snapshot
+        const result = await resolveStatus(client, args.simulation_id, detailed);
         return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
         throw toMcpError(err);
@@ -335,11 +375,20 @@ async function resolveCompletedStatus(
     totalRounds = runStatus.total_rounds;
   } catch { /* run status may not be available */ }
 
+  let reportMarkdown: string | undefined;
+  let reportSummary: string | undefined;
   try {
     const resp = await client.getSimulationPosts(sim.simulation_id, { limit: 0 });
     // Check if report exists without triggering generation
     const reportResp = await (client as any).get(`/api/report/by-simulation/${sim.simulation_id}`).catch(() => null);
     reportAvailable = reportResp?.data?.status === "completed";
+    if (reportAvailable) {
+      try {
+        const report = await client.getOrGenerateReport(sim.simulation_id);
+        reportMarkdown = report.markdown_content ?? undefined;
+        reportSummary = report.outline?.summary ?? undefined;
+      } catch { /* ignore */ }
+    }
   } catch { /* ignore */ }
 
   return {
@@ -351,6 +400,11 @@ async function resolveCompletedStatus(
     total_actions: totalActions,
     total_rounds: totalRounds > 0 ? totalRounds : undefined,
     report_available: reportAvailable,
-    message: `Prediction complete. ${sim.entities_count ?? "?"} agents generated ${totalActions} actions${totalRounds ? ` across ${totalRounds} rounds` : ""}.${reportAvailable ? " Report is ready — use get_report to view." : " Report is being generated..."}`,
+    report_summary: reportSummary,
+    report_markdown: reportMarkdown,
+    display_instructions: reportMarkdown
+      ? "Output report_markdown directly to the user — do not summarize or truncate."
+      : undefined,
+    message: `Prediction complete. ${sim.entities_count ?? "?"} agents generated ${totalActions} actions${totalRounds ? ` across ${totalRounds} rounds` : ""}.${reportAvailable ? " Report included below." : " Report is being generated..."}`,
   };
 }

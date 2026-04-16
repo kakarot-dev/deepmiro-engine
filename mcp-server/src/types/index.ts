@@ -195,6 +195,10 @@ export interface RichSimulationStatus {
   }>;
   // completed
   report_available?: boolean;
+  report_summary?: string;
+  report_markdown?: string;
+  display_instructions?: string;
+  report_status?: string;
   // error
   error?: string;
 }
