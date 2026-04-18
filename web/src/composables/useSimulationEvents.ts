@@ -1,0 +1,266 @@
+/**
+ * useSimulationEvents — Vue composable that merges snapshot + SSE stream.
+ *
+ * Opens an SSE connection to /api/simulation/:id/events. Exposes
+ * reactive refs that the UI binds to. When the sim reaches a terminal
+ * state, the stream closes automatically.
+ *
+ * Usage:
+ *   const { snapshot, state, actions, agents, isConnected, error } =
+ *     useSimulationEvents(computed(() => route.params.simId));
+ */
+
+import { onBeforeUnmount, ref, watch, type Ref } from "vue";
+import { getStatus } from "@/api/simulation";
+import { SimulationEventStream } from "@/lib/events";
+import { resolveArchetype } from "@/lib/archetypes";
+import type {
+  AgentActionRecord,
+  GraphEdge,
+  GraphNode,
+  LifecycleEvent,
+  SimSnapshot,
+  SimState,
+} from "@/types/api";
+
+const ACTION_FEED_CAP = 80;
+
+export function useSimulationEvents(simIdRef: Ref<string>) {
+  const snapshot = ref<SimSnapshot | null>(null);
+  const state = ref<SimState>("CREATED");
+  const progress = ref(0);
+  const currentRound = ref(0);
+  const totalRounds = ref(0);
+  const twitterActions = ref(0);
+  const redditActions = ref(0);
+  const actions = ref<AgentActionRecord[]>([]);
+  const agents = ref<GraphNode[]>([]);
+  const edges = ref<GraphEdge[]>([]);
+  const error = ref<string | null>(null);
+  const isConnected = ref(false);
+  const lastHeartbeat = ref<number>(0);
+
+  let stream: SimulationEventStream | null = null;
+
+  function resetAll() {
+    snapshot.value = null;
+    state.value = "CREATED";
+    progress.value = 0;
+    currentRound.value = 0;
+    totalRounds.value = 0;
+    twitterActions.value = 0;
+    redditActions.value = 0;
+    actions.value = [];
+    agents.value = [];
+    edges.value = [];
+    error.value = null;
+    isConnected.value = false;
+  }
+
+  function applySnapshot(snap: SimSnapshot) {
+    snapshot.value = snap;
+    state.value = snap.state;
+    progress.value = snap.progress_percent ?? 0;
+    currentRound.value = snap.current_round;
+    totalRounds.value = snap.total_rounds;
+    twitterActions.value = snap.twitter_actions_count;
+    redditActions.value = snap.reddit_actions_count;
+    if (snap.recent_actions?.length) {
+      actions.value = snap.recent_actions.slice(0, ACTION_FEED_CAP);
+    }
+    if (snap.error) {
+      error.value = snap.error;
+    }
+  }
+
+  async function hydrateAgents(simId: string) {
+    // Agents come from /profiles. Each profile maps to one GraphNode.
+    // We keep this separate from the event stream so it doesn't need
+    // to be fetched on every reconnect.
+    try {
+      const { getProfiles, getPosts } = await import("@/api/simulation");
+      const [profiles, postResp] = await Promise.all([
+        getProfiles(simId).catch(() => []),
+        getPosts(simId, 500).catch(() => ({ posts: [], total: 0 })),
+      ]);
+      const postCountByUser: Record<number, number> = {};
+      const lastPostByUser: Record<number, string> = {};
+      for (const p of postResp.posts ?? []) {
+        const uid = (p as any).user_id;
+        if (typeof uid !== "number") continue;
+        postCountByUser[uid] = (postCountByUser[uid] ?? 0) + 1;
+        if (!lastPostByUser[uid]) lastPostByUser[uid] = (p as any).content ?? "";
+      }
+      const nodes: GraphNode[] = (profiles ?? []).map((p, idx) => {
+        const id = p.user_id ?? p.agent_id ?? idx;
+        const name =
+          p.realname || p.name || p.username || p.user_name || `Agent ${id}`;
+        const entityType = p.entity_type || p.profession || "";
+        return {
+          id,
+          name,
+          archetype: entityType,
+          post_count: postCountByUser[id] ?? 0,
+          lastPost: lastPostByUser[id] ?? "",
+        };
+      });
+      agents.value = nodes;
+      // Edges: derive follow-graph from OASIS? We don't have a cheap
+      // way to fetch mid-sim. For now, seed with a fully-connected
+      // "mention" graph derived from shared archetype. Frontend
+      // visualization remains meaningful without a real edge list.
+      edges.value = buildArchetypeEdges(nodes);
+    } catch (err) {
+      console.warn("Failed to hydrate agents:", err);
+    }
+  }
+
+  function handleAction(evt: LifecycleEvent) {
+    const action = evt.payload as unknown as AgentActionRecord;
+    // Prepend (newest first), cap at limit
+    actions.value = [action, ...actions.value].slice(0, ACTION_FEED_CAP);
+    // Update agent post count if this is a content action
+    if (["CREATE_POST", "CREATE_COMMENT", "QUOTE_POST"].includes(action.action_type)) {
+      const node = agents.value.find((n) => n.id === action.agent_id);
+      if (node) {
+        node.post_count += 1;
+        const content = (action.action_args as any)?.content;
+        if (typeof content === "string" && content) {
+          node.lastPost = content;
+        }
+      }
+    }
+    // Advance counters live
+    if (action.platform === "twitter") twitterActions.value += 1;
+    else if (action.platform === "reddit") redditActions.value += 1;
+    if (action.round && action.round > currentRound.value) {
+      currentRound.value = action.round;
+    }
+  }
+
+  function handleStateChanged(evt: LifecycleEvent) {
+    const newState = evt.payload?.to as SimState | undefined;
+    if (newState) {
+      state.value = newState;
+      // When we hit SIMULATING, hydrate the agent list (profiles are
+      // written during GENERATING_PROFILES).
+      if (newState === "SIMULATING" && agents.value.length === 0) {
+        hydrateAgents(simIdRef.value);
+      }
+    }
+  }
+
+  function handleRoundEnd(evt: LifecycleEvent) {
+    const round = Number(evt.payload?.round ?? 0);
+    if (round > currentRound.value) currentRound.value = round;
+    if (totalRounds.value > 0) {
+      // Recompute progress estimate: rough but useful
+      const ratio = Math.min(1, round / totalRounds.value);
+      progress.value = Math.round(40 + 60 * ratio);
+    }
+  }
+
+  function openStream(simId: string) {
+    if (stream) stream.close();
+    stream = new SimulationEventStream(simId, {
+      onOpen: () => { isConnected.value = true; },
+      onClose: () => { isConnected.value = false; },
+      onConnectionError: () => { isConnected.value = false; },
+      onSnapshot: (snap) => {
+        applySnapshot(snap);
+        // If we already have SIMULATING state and no agents, hydrate
+        if (
+          (snap.state === "SIMULATING" || snap.state === "COMPLETED") &&
+          agents.value.length === 0
+        ) {
+          hydrateAgents(simId);
+        }
+      },
+      onAction: handleAction,
+      onStateChanged: handleStateChanged,
+      onRoundEnd: handleRoundEnd,
+      onHeartbeat: () => {
+        lastHeartbeat.value = Date.now();
+      },
+      onError: (evt) => {
+        const reason = evt.payload?.error ?? evt.payload?.context ?? "Unknown error";
+        error.value = String(reason);
+      },
+      onTerminal: (evt) => {
+        const to = evt.payload?.to as SimState | undefined;
+        if (to) state.value = to;
+        // Keep the stream open briefly so clients can see the final
+        // STATE_CHANGED; the server will close it from its side.
+      },
+    });
+  }
+
+  async function bootstrap(simId: string) {
+    resetAll();
+    try {
+      const snap = await getStatus(simId);
+      applySnapshot(snap);
+      if (snap.state === "SIMULATING" || snap.state === "COMPLETED") {
+        await hydrateAgents(simId);
+      }
+      openStream(simId);
+    } catch (err: any) {
+      error.value = err?.message ?? "Failed to load simulation";
+    }
+  }
+
+  watch(simIdRef, (newId, oldId) => {
+    if (newId && newId !== oldId) {
+      bootstrap(newId);
+    }
+  }, { immediate: true });
+
+  onBeforeUnmount(() => {
+    stream?.close();
+    stream = null;
+  });
+
+  return {
+    snapshot,
+    state,
+    progress,
+    currentRound,
+    totalRounds,
+    twitterActions,
+    redditActions,
+    actions,
+    agents,
+    edges,
+    error,
+    isConnected,
+    lastHeartbeat,
+  };
+}
+
+function buildArchetypeEdges(nodes: GraphNode[]): GraphEdge[] {
+  // Group nodes by archetype. Within a group, add a chain of edges
+  // so the force simulation clusters them visually. Between groups,
+  // add a single anchor edge so the graph stays connected.
+  const byArchetype: Record<string, GraphNode[]> = {};
+  for (const node of nodes) {
+    const arch = resolveArchetype(node.archetype).label;
+    (byArchetype[arch] = byArchetype[arch] ?? []).push(node);
+  }
+  const edges: GraphEdge[] = [];
+  const groupAnchors: GraphNode[] = [];
+  for (const group of Object.values(byArchetype)) {
+    for (let i = 0; i < group.length - 1; i++) {
+      edges.push({ source: group[i].id, target: group[i + 1].id, type: "cluster" });
+    }
+    if (group.length > 0) groupAnchors.push(group[0]);
+  }
+  // Inter-cluster anchors
+  for (let i = 0; i < groupAnchors.length - 1; i++) {
+    edges.push({
+      source: groupAnchors[i].id,
+      target: groupAnchors[i + 1].id,
+      type: "bridge",
+    });
+  }
+  return edges;
+}

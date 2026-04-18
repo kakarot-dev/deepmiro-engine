@@ -1,3 +1,16 @@
+# ─────────────────────────────────────────────────────────────────
+# Stage 1: build the Vue frontend bundle
+# ─────────────────────────────────────────────────────────────────
+FROM node:20-slim AS web-build
+WORKDIR /web
+COPY web/package.json web/package-lock.json* ./
+RUN npm ci --no-audit --no-fund
+COPY web/ ./
+RUN npm run build
+
+# ─────────────────────────────────────────────────────────────────
+# Stage 2: Python backend
+# ─────────────────────────────────────────────────────────────────
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -16,6 +29,10 @@ COPY engine/ /app/deepmiro/engine/
 COPY locales/ /app/deepmiro/locales/
 COPY static/ /app/deepmiro/static/
 
+# Copy the built frontend from the web-build stage. Flask serves this
+# directory when WEB_DIST points at it (see engine/app/__init__.py).
+COPY --from=web-build /web/dist /app/deepmiro/web/dist
+
 # Install Python deps
 WORKDIR /app/deepmiro/engine
 RUN uv venv .venv && \
@@ -24,6 +41,8 @@ RUN uv venv .venv && \
     uv pip install surrealdb
 
 ENV PATH="/app/deepmiro/engine/.venv/bin:$PATH"
+ENV WEB_DIST=/app/deepmiro/web/dist
+
 EXPOSE 5001
 
 CMD ["python", "run.py"]

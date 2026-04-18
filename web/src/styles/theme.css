@@ -1,0 +1,83 @@
+/* DeepMiro theme — brand palette.
+ *
+ * Anchored on #22d3ee (cyan, from README badges) + a dark neutral scheme
+ * that matches the hosted dashboard. Single source of truth for colors;
+ * every component references var(--*), never raw hex.
+ */
+
+:root {
+  /* Brand + primary actions */
+  --primary: #22d3ee;
+  --primary-hover: #67e8f9;
+  --primary-active: #0891b2;
+  --primary-muted: rgba(34, 211, 238, 0.15);
+
+  /* Backgrounds */
+  --bg: #0a0f14;
+  --bg-elevated: #0f1620;
+  --card: #0f1620;
+  --card-hover: #141b26;
+  --panel: #0d131b;
+
+  /* Text */
+  --fg: #e6edf3;
+  --fg-strong: #f5f7fa;
+  --fg-muted: #8b98a5;
+  --fg-subtle: #5d6a78;
+
+  /* Borders + dividers */
+  --border: #1e2a36;
+  --border-subtle: #131c26;
+  --border-strong: #2a3a4a;
+
+  /* Semantic */
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+
+  /* Archetype palette (graph node colors, chip backgrounds) */
+  --arch-tech: #22d3ee;        /* TechCEO, TechExecutive */
+  --arch-politician: #a78bfa;  /* Politician, Government */
+  --arch-media: #f97316;       /* Journalist, Media */
+  --arch-activist: #22c55e;    /* AdvocacyGroup, ACLU */
+  --arch-business: #fbbf24;    /* Corporation, Brand */
+  --arch-developer: #84cc16;   /* AppDeveloper */
+  --arch-researcher: #38bdf8;  /* AcademicResearcher */
+  --arch-community: #ec4899;   /* Subreddit, Community */
+  --arch-platform: #60a5fa;    /* PlatformCompany */
+  --arch-person: #94a3b8;      /* Fallback */
+
+  /* Spacing scale */
+  --gap-xs: 4px;
+  --gap-sm: 8px;
+  --gap-md: 16px;
+  --gap-lg: 24px;
+  --gap-xl: 40px;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+  --glow-primary: 0 0 20px rgba(34, 211, 238, 0.25);
+
+  /* Animation */
+  --duration-fast: 180ms;
+  --duration-normal: 360ms;
+  --duration-slow: 720ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* Typography */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+               "Segoe UI", "Inter", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+               "Liberation Mono", "Courier New", monospace;
+}

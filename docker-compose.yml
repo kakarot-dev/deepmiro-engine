@@ -157,20 +157,20 @@ services:
       # your local .env or Railway Variables tab.
       - LLM_BOOST_API_KEY
       - EMBEDDING_API_KEY
-    # Backend is internal-only by default. MCP is the public entry
-    # point (see the mcp service below) and proxies to the backend
-    # inside the compose network. The REST API is reachable on the
-    # internal DNS name `backend:5001` but NOT on the host.
+    # The backend serves BOTH the REST API (/api/*) AND the Vue web UI
+    # (/, static assets). The UI bundle is built into the Docker image
+    # via docker/Dockerfile.backend's multi-stage build.
     #
-    # If you want direct host-level access to the REST API — e.g.
-    # for dashboards, custom clients, or curl-based testing without
-    # the MCP layer — uncomment the ports: block below. On a
-    # public VPS or Railway deployment, leaving it internal is the
-    # safer default because the REST API has no built-in auth.
+    # Self-hosters hit the UI at http://localhost:5001/ after
+    # `docker compose up`. Set DEEPMIRO_API_KEY in .env to require
+    # an API key on mutating routes + the SSE event stream.
     expose:
       - "5001"
-    # ports:
-    #   - "${BACKEND_PORT:-5001}:5001"
+    ports:
+      - "${BACKEND_PORT:-5001}:5001"
+    environment:
+      - DEEPMIRO_API_KEY
+      - DEEPMIRO_WATCHDOG_STALE_SECONDS
     volumes:
       - uploads:/app/deepmiro/engine/uploads
     depends_on:

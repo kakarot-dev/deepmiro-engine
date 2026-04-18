@@ -106,7 +106,19 @@ def _recover_interrupted_simulations(logger) -> None:
 
 def create_app(config_class=Config):
     """Flask application factory."""
-    app = Flask(__name__)
+    # Path to the built frontend bundle. WEB_DIST env var overrides the
+    # default; useful for local dev where the bundle lives in `web/dist`
+    # relative to the repo root rather than inside the Docker image.
+    _default_web_dist = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "web", "dist")
+    )
+    web_dist = os.environ.get("WEB_DIST", _default_web_dist)
+
+    if os.path.isdir(web_dist):
+        app = Flask(__name__, static_folder=web_dist, static_url_path="")
+    else:
+        app = Flask(__name__)
+
     app.config.from_object(config_class)
 
     # Disable ASCII escaping so Chinese / emoji characters show as-is.
@@ -193,6 +205,33 @@ def create_app(config_class=Config):
     @app.route('/health')
     def health():
         return {'status': 'ok', 'service': 'DeepMiro Backend'}
+
+    # SPA catch-all: serve index.html for non-API routes so vue-router's
+    # history mode works. Static assets are served by Flask's built-in
+    # static handler (configured via static_folder above); this route only
+    # handles "pretty" paths like /sim/sim_abc/report.
+    from flask import send_from_directory
+
+    @app.route('/', defaults={'path': ''})
+    @app.route('/<path:path>')
+    def spa(path: str):
+        # API routes handled by blueprints; catch-all shouldn't touch them.
+        if path.startswith('api/') or path == 'health':
+            from flask import abort
+            abort(404)
+        if os.path.isdir(web_dist):
+            full = os.path.join(web_dist, path)
+            if path and os.path.exists(full) and os.path.isfile(full):
+                return send_from_directory(web_dist, path)
+            index = os.path.join(web_dist, "index.html")
+            if os.path.exists(index):
+                return send_from_directory(web_dist, "index.html")
+        # No bundle and not an API route — return a friendly JSON.
+        return {
+            'service': 'DeepMiro Backend',
+            'status': 'ok',
+            'note': 'Web UI bundle not present. Build web/ and set WEB_DIST, or hit /api/* directly.',
+        }
 
     if should_log_startup:
         logger.info("DeepMiro Backend ready")
