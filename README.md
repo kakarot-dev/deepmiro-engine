@@ -56,22 +56,33 @@ Sign up at [deepmiro.org](https://deepmiro.org) → Dashboard → API Keys. Your
 
 ### 2. Install
 
-**Claude Code (plugin — recommended)** — one command gets you the `/predict` skill + the MCP server wired up:
+Pick the install path for your client. **Don't install the `.mcpb` desktop extension if you're using Claude Code or Claude Cowork** — those need the plugin to get the `/predict` skill, background polling, and live narration.
+
+#### Claude Desktop → use `.mcpb`
+
+1. Download `deepmiro.mcpb` from the [latest release](https://github.com/kakarot-dev/deepmiro/releases/latest)
+2. Claude Desktop → Settings → Extensions → Advanced settings → Install Extension → pick the file
+3. Paste your API key when prompted
+
+#### Claude Code & Claude Cowork → use the plugin
+
+The plugin ships the `/predict` skill — the MCP alone is missing the orchestration logic (background polling via cron, live agent narration, the setup wizard).
 
 ```bash
 claude plugin marketplace add kakarot-dev/deepmiro
 claude plugin install deepmiro@deepmiro-marketplace
-export DEEPMIRO_API_KEY=dm_your_key   # or set it in ~/.claude/settings.json
+export DEEPMIRO_API_KEY=dm_your_key   # or set in ~/.claude/settings.json
 ```
 
-Then restart Claude Code and say `/predict` or `predict how people will react to [scenario]`.
+Restart Claude Code, then say `/predict` or `predict how people will react to [scenario]`.
 
-**Other clients:**
+#### Everywhere else → npm package
+
+Generic MCP install for clients that aren't Claude Desktop, Claude Code, or Claude Cowork:
 
 | Client | Install |
 |--------|---------|
 | **OpenAI Codex** | `codex plugin install kakarot-dev/deepmiro` |
-| **Claude Desktop** | Add to `claude_desktop_config.json`: `"deepmiro": {"command": "npx", "args": ["-y", "deepmiro-mcp"], "env": {"DEEPMIRO_API_KEY": "dm_xxx"}}` |
 | **ChatGPT Desktop** | Settings → MCP Servers → Add → `npx deepmiro-mcp` with env `DEEPMIRO_API_KEY` |
 | **Cursor / Windsurf** | Settings → MCP → Add → `npx deepmiro-mcp` with env `DEEPMIRO_API_KEY` |
 | **VS Code (Copilot)** | Add to `.vscode/mcp.json`: `"deepmiro": {"command": "npx", "args": ["-y", "deepmiro-mcp"], "env": {"DEEPMIRO_API_KEY": "dm_xxx"}}` |
