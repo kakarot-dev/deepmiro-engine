@@ -1,18 +1,36 @@
 <script setup lang="ts">
+/**
+ * PersonasView — universal layout. Graph stays primary on the left;
+ * scrollable persona card grid lives in the right rail.
+ */
 import { computed } from "vue";
+import UniversalStepLayout from "@/components/UniversalStepLayout.vue";
+import GraphPanel from "@/components/GraphPanel.vue";
+import GraphBuildingView from "@/components/phases/GraphBuildingView.vue";
 import PersonaCard from "@/components/PersonaCard.vue";
-import type { AgentProfile } from "@/types/api";
+import type { AgentProfile, GraphEdge, GraphNode, SimSnapshot } from "@/types/api";
 
 interface Props {
   profiles: AgentProfile[];
+  agents: GraphNode[];
+  edges: GraphEdge[];
+  snapshot: SimSnapshot | null;
   expectedCount: number;
-  /** When true, the grid is in "still generating" mode and shows a header hint. */
   generating?: boolean;
+  recentlyActive?: Map<number, number>;
+  recentlyActiveEdges?: Map<string, number>;
 }
-const props = withDefaults(defineProps<Props>(), { generating: false });
-const emit = defineEmits<{ select: [profile: AgentProfile] }>();
+const props = withDefaults(defineProps<Props>(), {
+  generating: false,
+  recentlyActive: () => new Map<number, number>(),
+  recentlyActiveEdges: () => new Map<string, number>(),
+});
+const emit = defineEmits<{
+  "select-persona": [profile: AgentProfile];
+  "select-agent": [agent: GraphNode | null];
+  "select-edge": [edge: GraphEdge | null];
+}>();
 
-// Newest first while generating, alphabetical when complete
 const ordered = computed(() => {
   if (props.generating) return [...props.profiles].reverse();
   return [...props.profiles].sort((a, b) => {
@@ -24,49 +42,52 @@ const ordered = computed(() => {
 </script>
 
 <template>
-  <div class="layout">
-    <div class="head">
-      <h2>Personas</h2>
-      <span class="sub">
-        {{ profiles.length }}<span v-if="expectedCount">/{{ expectedCount }}</span> generated
-        <span v-if="generating" class="generating-pill">generating…</span>
-      </span>
-    </div>
-    <div class="grid-wrap">
-      <div class="grid">
+  <UniversalStepLayout>
+    <GraphBuildingView v-if="agents.length === 0" :snapshot="snapshot" />
+    <GraphPanel
+      v-else
+      :agents="agents"
+      :edges="edges"
+      :recently-active="recentlyActive"
+      :recently-active-edges="recentlyActiveEdges"
+      @select="(a) => emit('select-agent', a)"
+      @select-edge="(e) => emit('select-edge', e)"
+    />
+    <template #rail>
+      <div class="rail-head">
+        <div class="rail-title">Personas</div>
+        <span class="sub">
+          {{ profiles.length }}<span v-if="expectedCount">/{{ expectedCount }}</span>
+          <span v-if="generating" class="generating-pill">generating…</span>
+        </span>
+      </div>
+      <div class="rail-list">
         <TransitionGroup name="persona">
           <PersonaCard
             v-for="profile in ordered"
             :key="profile.user_id ?? profile.username ?? profile.name"
             :profile="profile"
-            @click="emit('select', profile)"
+            @click="emit('select-persona', profile)"
           />
         </TransitionGroup>
+        <div v-if="profiles.length === 0" class="empty">
+          Personas will appear as they are generated.
+        </div>
       </div>
-      <div v-if="profiles.length === 0" class="empty">
-        Personas will appear here as they are generated.
-      </div>
-    </div>
-  </div>
+    </template>
+  </UniversalStepLayout>
 </template>
 
 <style scoped>
-.layout {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-}
-.head {
+.rail-head {
   display: flex;
   align-items: baseline;
-  gap: var(--gap-md);
+  justify-content: space-between;
   padding: var(--gap-md) var(--gap-lg);
   border-bottom: 1px solid var(--border);
 }
-.head h2 {
-  margin: 0;
-  font-size: 16px;
+.rail-title {
+  font-size: 14px;
   font-weight: 600;
   color: var(--fg-strong);
 }
@@ -89,21 +110,18 @@ const ordered = computed(() => {
   letter-spacing: 0.06em;
   animation: pulse-fade 2s ease-in-out infinite;
 }
-.grid-wrap {
+.rail-list {
   flex: 1;
-  min-height: 0;
   overflow-y: auto;
-  padding: var(--gap-lg);
-}
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: var(--gap-md);
+  padding: var(--gap-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
 }
 .empty {
-  padding: var(--gap-xl);
+  padding: var(--gap-lg);
   text-align: center;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--fg-subtle);
 }
 @keyframes pulse-fade {

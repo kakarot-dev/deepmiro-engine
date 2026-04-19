@@ -14,8 +14,18 @@ interface Props {
   edges: GraphEdge[];
   twitterCount: number;
   redditCount: number;
+  recentlyActive?: Map<number, number>;
+  recentlyActiveEdges?: Map<string, number>;
 }
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  recentlyActive: () => new Map<number, number>(),
+  recentlyActiveEdges: () => new Map<string, number>(),
+});
+const emit = defineEmits<{
+  "select-action": [action: AgentActionRecord];
+  "select-agent": [agent: GraphNode | null];
+  "select-edge": [edge: GraphEdge | null];
+}>();
 const router = useRouter();
 
 const totalActions = computed(() => props.twitterCount + props.redditCount);
@@ -44,8 +54,14 @@ function viewReport() {
         :actions="actions"
         :agents="agents"
         :edges="edges"
+        :snapshot="snapshot"
         :twitter-count="twitterCount"
         :reddit-count="redditCount"
+        :recently-active="recentlyActive"
+        :recently-active-edges="recentlyActiveEdges"
+        @select-action="(a) => emit('select-action', a)"
+        @select-agent="(a) => emit('select-agent', a)"
+        @select-edge="(e) => emit('select-edge', e)"
       />
     </div>
   </div>

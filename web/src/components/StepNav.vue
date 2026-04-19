@@ -95,6 +95,7 @@ function onClick(s: ReturnType<typeof statusOf>, key: StepKey) {
 .step-nav {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   padding: 0 var(--gap-lg);
   height: 44px;

@@ -8,9 +8,11 @@ interface Props {
   edges: GraphEdge[];
   snapshot: SimSnapshot | null;
   recentlyActive?: Map<number, number>;
+  recentlyActiveEdges?: Map<string, number>;
 }
 const props = withDefaults(defineProps<Props>(), {
   recentlyActive: () => new Map<number, number>(),
+  recentlyActiveEdges: () => new Map<string, number>(),
 });
 const emit = defineEmits<{
   select: [agent: GraphNode | null];
@@ -21,14 +23,13 @@ const isEmpty = () => props.agents.length === 0;
 </script>
 
 <template>
-  <!-- If no agents yet, show the rich GRAPH_BUILDING hero. Otherwise
-       show the actual force graph full-screen. -->
   <GraphBuildingView v-if="isEmpty()" :snapshot="snapshot" />
   <div v-else class="graph-wrap">
     <GraphPanel
       :agents="agents"
       :edges="edges"
       :recently-active="recentlyActive"
+      :recently-active-edges="recentlyActiveEdges"
       @select="(a) => emit('select', a)"
       @select-edge="(e) => emit('select-edge', e)"
     />

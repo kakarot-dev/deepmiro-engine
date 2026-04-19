@@ -40,9 +40,12 @@ interface Props {
   edges: GraphEdge[];
   // Highlights nodes that just posted; map of nodeId → last-post timestamp ms
   recentlyActive?: Map<number, number>;
+  // Highlights edges incident to a recent action; "src-tgt" → ts
+  recentlyActiveEdges?: Map<string, number>;
 }
 const props = withDefaults(defineProps<Props>(), {
   recentlyActive: () => new Map<number, number>(),
+  recentlyActiveEdges: () => new Map<string, number>(),
 });
 const emit = defineEmits<{
   select: [agent: GraphNode | null];
@@ -142,6 +145,15 @@ const INTERACTION_COLORS: Record<string, string> = {
 };
 function isActive(n: D3Node): boolean {
   const ts = props.recentlyActive.get(n.id);
+  if (!ts) return false;
+  return Date.now() - ts < 2500;
+}
+function isEdgeActive(e: D3Link): boolean {
+  const s = (e.source as D3Node).id ?? (e.source as number);
+  const t = (e.target as D3Node).id ?? (e.target as number);
+  const ts =
+    props.recentlyActiveEdges.get(`${s}-${t}`) ??
+    props.recentlyActiveEdges.get(`${t}-${s}`);
   if (!ts) return false;
   return Date.now() - ts < 2500;
 }
@@ -514,6 +526,12 @@ function tick() {
       const dr = Math.sqrt(dx * dx + dy * dy) * 1.8;
       return `M${sx},${sy} A${dr},${dr} 0 0,1 ${tx},${ty}`;
     });
+  // Pulse recently-used edges: thicker stroke + brighter, fades over
+  // ~2.5s. The edge-active state is driven by recentlyActiveEdges.
+  root
+    .select(".links")
+    .selectAll<SVGPathElement, D3Link>("path.link")
+    .attr("stroke-width", (d) => (isEdgeActive(d) ? 3.4 : 1.4));
   // Edge labels follow path midpoint
   if (labelsRef.value) {
     const t = transform.value;

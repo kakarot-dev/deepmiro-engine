@@ -2,7 +2,7 @@
 import { AlertTriangle, RefreshCw } from "lucide-vue-next";
 import Button from "@/components/ui/Button.vue";
 import SimulatingView from "@/components/phases/SimulatingView.vue";
-import type { AgentActionRecord, GraphEdge, GraphNode, SimState } from "@/types/api";
+import type { AgentActionRecord, GraphEdge, GraphNode, SimSnapshot, SimState } from "@/types/api";
 
 interface Props {
   state: SimState;
@@ -10,10 +10,21 @@ interface Props {
   actions: AgentActionRecord[];
   agents: GraphNode[];
   edges: GraphEdge[];
+  snapshot: SimSnapshot | null;
   twitterCount: number;
   redditCount: number;
+  recentlyActive?: Map<number, number>;
+  recentlyActiveEdges?: Map<string, number>;
 }
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  recentlyActive: () => new Map<number, number>(),
+  recentlyActiveEdges: () => new Map<string, number>(),
+});
+const emit = defineEmits<{
+  "select-action": [action: AgentActionRecord];
+  "select-agent": [agent: GraphNode | null];
+  "select-edge": [edge: GraphEdge | null];
+}>();
 
 const titles: Record<string, string> = {
   FAILED: "Simulation failed",
@@ -45,8 +56,14 @@ const titles: Record<string, string> = {
         :actions="actions"
         :agents="agents"
         :edges="edges"
+        :snapshot="snapshot"
         :twitter-count="twitterCount"
         :reddit-count="redditCount"
+        :recently-active="recentlyActive"
+        :recently-active-edges="recentlyActiveEdges"
+        @select-action="(a) => emit('select-action', a)"
+        @select-agent="(a) => emit('select-agent', a)"
+        @select-edge="(e) => emit('select-edge', e)"
       />
     </div>
   </div>

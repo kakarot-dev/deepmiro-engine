@@ -8,11 +8,14 @@ import SimulatingView from "@/components/phases/SimulatingView.vue";
 import InlineReportView from "@/components/phases/InlineReportView.vue";
 import PersonaSheet from "@/components/PersonaSheet.vue";
 import ConnectionSheet from "@/components/ConnectionSheet.vue";
+import ActionSheet from "@/components/ActionSheet.vue";
+import CompletedView from "@/components/phases/CompletedView.vue";
+import TerminalView from "@/components/phases/TerminalView.vue";
 import Button from "@/components/ui/Button.vue";
 import { useSimulationEvents } from "@/composables/useSimulationEvents";
 import { cancelSim } from "@/api/simulation";
 import { useActiveSimStore } from "@/stores/activeSim";
-import type { AgentProfile, GraphEdge, GraphNode } from "@/types/api";
+import type { AgentActionRecord, AgentProfile, GraphEdge, GraphNode } from "@/types/api";
 
 interface Props {
   simId: string;
@@ -34,6 +37,7 @@ const {
   profiles,
   scenario,
   recentlyActive,
+  recentlyActiveEdges,
   error,
 } = useSimulationEvents(simIdRef);
 
@@ -130,7 +134,8 @@ function profileNameOf(p: AgentProfile): string {
 }
 function openSheetForAgent(agent: GraphNode | null) {
   if (!agent) { sheetOpen.value = false; return; }
-  connectionSheetOpen.value = false; // close edge sheet if open
+  connectionSheetOpen.value = false;
+  actionSheetOpen.value = false;
   sheetAgent.value = agent;
   // Match by id first (persona-only graph), then by name (entity graph
   // where ids are hashed from the entity name).
@@ -159,9 +164,20 @@ const connectionSheetOpen = ref(false);
 const selectedEdge = ref<GraphEdge | null>(null);
 function openConnectionSheet(edge: GraphEdge | null) {
   if (!edge) { connectionSheetOpen.value = false; return; }
-  sheetOpen.value = false; // close persona sheet if open
+  sheetOpen.value = false;
+  actionSheetOpen.value = false;
   selectedEdge.value = edge;
   connectionSheetOpen.value = true;
+}
+
+// Action sheet — opens when an action card is clicked.
+const actionSheetOpen = ref(false);
+const selectedAction = ref<AgentActionRecord | null>(null);
+function openActionSheet(action: AgentActionRecord) {
+  sheetOpen.value = false;
+  connectionSheetOpen.value = false;
+  selectedAction.value = action;
+  actionSheetOpen.value = true;
 }
 
 const sheetActions = computed(() => {
@@ -216,23 +232,82 @@ const terminalLabel = computed(() => {
         :edges="edges"
         :snapshot="snapshot"
         :recently-active="recentlyActive"
-        @select="(a) => { openSheetForAgent(a); }"
+        :recently-active-edges="recentlyActiveEdges"
+        @select="openSheetForAgent"
         @select-edge="openConnectionSheet"
       />
       <PersonasView
         v-else-if="activeStep === 'personas'"
         :profiles="profiles"
+        :agents="agents"
+        :edges="edges"
+        :snapshot="snapshot"
         :expected-count="snapshot?.entities_count ?? 0"
         :generating="state === 'GENERATING_PROFILES'"
-        @select="openSheetForProfile"
+        :recently-active="recentlyActive"
+        :recently-active-edges="recentlyActiveEdges"
+        @select-persona="openSheetForProfile"
+        @select-agent="openSheetForAgent"
+        @select-edge="openConnectionSheet"
+      />
+      <SimulatingView
+        v-else-if="activeStep === 'activity' && state === 'SIMULATING'"
+        :actions="actions"
+        :agents="agents"
+        :edges="edges"
+        :snapshot="snapshot"
+        :twitter-count="twitterActions"
+        :reddit-count="redditActions"
+        :recently-active="recentlyActive"
+        :recently-active-edges="recentlyActiveEdges"
+        @select-action="openActionSheet"
+        @select-agent="openSheetForAgent"
+        @select-edge="openConnectionSheet"
+      />
+      <CompletedView
+        v-else-if="activeStep === 'activity' && state === 'COMPLETED'"
+        :sim-id="simId"
+        :snapshot="snapshot"
+        :actions="actions"
+        :agents="agents"
+        :edges="edges"
+        :twitter-count="twitterActions"
+        :reddit-count="redditActions"
+        :recently-active="recentlyActive"
+        :recently-active-edges="recentlyActiveEdges"
+        @select-action="openActionSheet"
+        @select-agent="openSheetForAgent"
+        @select-edge="openConnectionSheet"
+      />
+      <TerminalView
+        v-else-if="activeStep === 'activity' && isTerminal"
+        :state="state"
+        :error="error"
+        :actions="actions"
+        :agents="agents"
+        :edges="edges"
+        :snapshot="snapshot"
+        :twitter-count="twitterActions"
+        :reddit-count="redditActions"
+        :recently-active="recentlyActive"
+        :recently-active-edges="recentlyActiveEdges"
+        @select-action="openActionSheet"
+        @select-agent="openSheetForAgent"
+        @select-edge="openConnectionSheet"
       />
       <SimulatingView
         v-else-if="activeStep === 'activity'"
         :actions="actions"
         :agents="agents"
         :edges="edges"
+        :snapshot="snapshot"
         :twitter-count="twitterActions"
         :reddit-count="redditActions"
+        :recently-active="recentlyActive"
+        :recently-active-edges="recentlyActiveEdges"
+        @select-action="openActionSheet"
+        @select-agent="openSheetForAgent"
+        @select-edge="openConnectionSheet"
       />
       <InlineReportView
         v-else-if="activeStep === 'report'"
@@ -263,6 +338,12 @@ const terminalLabel = computed(() => {
       :actions="actions"
       :scenario="scenario"
       @update:open="(v) => (connectionSheetOpen = v)"
+    />
+    <ActionSheet
+      :open="actionSheetOpen"
+      :action="selectedAction"
+      :agents="agents"
+      @update:open="(v) => (actionSheetOpen = v)"
     />
 
     <div v-if="error && !isTerminal && state !== 'COMPLETED'" class="error-toast">

@@ -1,141 +1,147 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { Twitter, MessagesSquare, Network as NetworkIcon, X as XIcon } from "lucide-vue-next";
-import ActionCard from "@/components/ActionCard.vue";
+/**
+ * SimulatingView — universal layout. Graph stays primary on the left;
+ * the right rail is the live action feed with platform tabs and
+ * clickable cards (each opens an ActionSheet).
+ */
+import { computed, ref, watch, nextTick } from "vue";
+import UniversalStepLayout from "@/components/UniversalStepLayout.vue";
 import GraphPanel from "@/components/GraphPanel.vue";
-import Button from "@/components/ui/Button.vue";
-import type { AgentActionRecord, GraphEdge, GraphNode } from "@/types/api";
+import GraphBuildingView from "@/components/phases/GraphBuildingView.vue";
+import ActionCard from "@/components/ActionCard.vue";
+import type { AgentActionRecord, GraphEdge, GraphNode, SimSnapshot } from "@/types/api";
 
 interface Props {
   actions: AgentActionRecord[];
   agents: GraphNode[];
   edges: GraphEdge[];
+  snapshot: SimSnapshot | null;
   twitterCount: number;
   redditCount: number;
+  recentlyActive?: Map<number, number>;
+  recentlyActiveEdges?: Map<string, number>;
 }
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  recentlyActive: () => new Map<number, number>(),
+  recentlyActiveEdges: () => new Map<string, number>(),
+});
+const emit = defineEmits<{
+  "select-action": [action: AgentActionRecord];
+  "select-agent": [agent: GraphNode | null];
+  "select-edge": [edge: GraphEdge | null];
+}>();
 
-const showGraph = ref(false);
+type Filter = "all" | "twitter" | "reddit";
+const filter = ref<Filter>("all");
+const feedRef = ref<HTMLDivElement | null>(null);
+
 const agentMap = computed(() => {
   const m = new Map<number, GraphNode>();
   for (const a of props.agents) m.set(a.id, a);
   return m;
 });
-const twitter = computed(() => props.actions.filter((a) => a.platform === "twitter").slice(0, 50));
-const reddit = computed(() => props.actions.filter((a) => a.platform === "reddit").slice(0, 50));
+const filtered = computed(() => {
+  let list = props.actions;
+  if (filter.value !== "all") {
+    list = list.filter((a) => a.platform === filter.value);
+  }
+  return list.slice(0, 100);
+});
+
+// Auto-scroll to top when a new action arrives (newest first)
+watch(() => props.actions.length, async () => {
+  await nextTick();
+  feedRef.value?.scrollTo({ top: 0, behavior: "smooth" });
+});
 </script>
 
 <template>
-  <div class="layout">
-    <div class="cols">
-      <div class="col">
-        <div class="col-head">
-          <div class="title">
-            <Twitter :size="14" />
-            <span>Twitter</span>
-          </div>
-          <span class="count">{{ twitterCount }} actions</span>
-        </div>
-        <div class="feed">
-          <TransitionGroup name="action">
-            <ActionCard
-              v-for="action in twitter"
-              :key="action.timestamp + '_' + action.agent_id + '_' + action.action_type"
-              :action="action"
-              :agent="agentMap.get(action.agent_id)"
-            />
-          </TransitionGroup>
-          <div v-if="twitter.length === 0" class="empty">No twitter actions yet.</div>
-        </div>
-      </div>
-      <div class="col">
-        <div class="col-head">
-          <div class="title">
-            <MessagesSquare :size="14" />
-            <span>Reddit</span>
-          </div>
-          <span class="count">{{ redditCount }} actions</span>
-        </div>
-        <div class="feed">
-          <TransitionGroup name="action">
-            <ActionCard
-              v-for="action in reddit"
-              :key="action.timestamp + '_' + action.agent_id + '_' + action.action_type"
-              :action="action"
-              :agent="agentMap.get(action.agent_id)"
-            />
-          </TransitionGroup>
-          <div v-if="reddit.length === 0" class="empty">No reddit actions yet.</div>
+  <UniversalStepLayout>
+    <GraphBuildingView v-if="agents.length === 0" :snapshot="snapshot" />
+    <GraphPanel
+      v-else
+      :agents="agents"
+      :edges="edges"
+      :recently-active="recentlyActive"
+      :recently-active-edges="recentlyActiveEdges"
+      @select="(a) => emit('select-agent', a)"
+      @select-edge="(e) => emit('select-edge', e)"
+    />
+    <template #rail>
+      <div class="rail-head">
+        <div class="rail-title">Live activity</div>
+        <div class="filter">
+          <button
+            v-for="opt in (['all', 'twitter', 'reddit'] as Filter[])"
+            :key="opt"
+            class="filter-btn"
+            :class="{ active: filter === opt }"
+            @click="filter = opt"
+          >
+            {{ opt }}
+            <span v-if="opt === 'twitter'" class="dim">{{ twitterCount }}</span>
+            <span v-else-if="opt === 'reddit'" class="dim">{{ redditCount }}</span>
+            <span v-else class="dim">{{ twitterCount + redditCount }}</span>
+          </button>
         </div>
       </div>
-    </div>
-
-    <div class="minimap-toggle">
-      <Button size="sm" variant="ghost" @click="showGraph = !showGraph">
-        <NetworkIcon :size="14" />
-        {{ showGraph ? "Hide" : "Show" }} graph
-      </Button>
-    </div>
-
-    <Teleport to="body">
-      <transition name="map">
-        <div v-if="showGraph" class="map-overlay" @click.self="showGraph = false">
-          <div class="map-shell">
-            <button class="map-close" @click="showGraph = false" aria-label="Close graph">
-              <XIcon :size="16" />
-            </button>
-            <GraphPanel :agents="agents" :edges="edges" />
-          </div>
+      <div class="feed" ref="feedRef">
+        <TransitionGroup name="action">
+          <ActionCard
+            v-for="a in filtered"
+            :key="a.timestamp + '_' + a.agent_id + '_' + a.action_type"
+            :action="a"
+            :agent="agentMap.get(a.agent_id)"
+            class="clickable"
+            @click="emit('select-action', a)"
+          />
+        </TransitionGroup>
+        <div v-if="filtered.length === 0" class="empty">
+          No actions yet.
         </div>
-      </transition>
-    </Teleport>
-  </div>
+      </div>
+    </template>
+  </UniversalStepLayout>
 </template>
 
 <style scoped>
-.layout {
-  position: relative;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-}
-.cols {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  height: 100%;
-  min-height: 0;
-}
-.col {
+.rail-head {
+  padding: var(--gap-sm) var(--gap-md);
+  border-bottom: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  border-right: 1px solid var(--border);
+  gap: var(--gap-sm);
 }
-.col:last-child { border-right: none; }
-.col-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--gap-md) var(--gap-lg);
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-elevated);
-}
-.title {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
+.rail-title {
+  font-size: 14px;
   font-weight: 600;
   color: var(--fg-strong);
-  letter-spacing: 0.02em;
 }
-.count {
-  font-size: 11px;
+.filter { display: flex; gap: 4px; }
+.filter-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   color: var(--fg-muted);
-  font-variant-numeric: tabular-nums;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  text-transform: capitalize;
+  transition: all var(--duration-fast) var(--ease-out);
 }
+.filter-btn:hover { color: var(--fg); border-color: var(--border-strong); }
+.filter-btn.active {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
+}
+.dim { color: var(--fg-subtle); font-variant-numeric: tabular-nums; }
 .feed {
   flex: 1;
   overflow-y: auto;
@@ -143,6 +149,7 @@ const reddit = computed(() => props.actions.filter((a) => a.platform === "reddit
   display: flex;
   flex-direction: column;
   gap: var(--gap-sm);
+  scroll-behavior: smooth;
 }
 .empty {
   padding: var(--gap-lg);
@@ -150,66 +157,15 @@ const reddit = computed(() => props.actions.filter((a) => a.platform === "reddit
   font-size: 12px;
   color: var(--fg-subtle);
 }
-.minimap-toggle {
-  position: absolute;
-  bottom: var(--gap-md);
-  right: var(--gap-md);
-  z-index: 8;
-}
-.map-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  background: rgba(5, 9, 13, 0.6);
-  backdrop-filter: blur(6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--gap-xl);
-}
-.map-shell {
-  position: relative;
-  width: min(1100px, 100%);
-  height: min(700px, 100%);
-  background: var(--panel);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  box-shadow: var(--shadow-lg);
-}
-.map-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 5;
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-md);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-strong);
-  color: var(--fg);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-out);
-}
-.map-close:hover { color: var(--primary); border-color: var(--primary); }
-.map-enter-active, .map-leave-active { transition: opacity 220ms ease; }
-.map-enter-from, .map-leave-to { opacity: 0; }
-
+.clickable { cursor: pointer; }
 .action-enter-active {
-  transition: all 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .action-enter-from {
   opacity: 0;
-  transform: translateY(-12px);
+  transform: translateY(-12px) scale(0.97);
+  filter: blur(2px);
 }
-.action-leave-active {
-  transition: all 200ms ease;
-}
-.action-leave-to {
-  opacity: 0;
-  transform: scale(0.96);
-}
+.action-leave-active { transition: all 200ms ease; }
+.action-leave-to { opacity: 0; transform: scale(0.96); }
 </style>

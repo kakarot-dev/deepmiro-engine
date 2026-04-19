@@ -47,6 +47,9 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
   const interactions = ref<InteractionEdge[]>([]);
   // Tracks node IDs that recently posted (for graph glow pulse)
   const recentlyActive = ref<Map<number, number>>(new Map());
+  // Tracks edge keys ("src-tgt") recently used by an action so the
+  // GraphPanel can pulse them. Same TTL sweep as recentlyActive.
+  const recentlyActiveEdges = ref<Map<string, number>>(new Map());
   const error = ref<string | null>(null);
   const isConnected = ref(false);
   const lastHeartbeat = ref<number>(0);
@@ -86,6 +89,7 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
     scenario.value = null;
     interactions.value = [];
     recentlyActive.value = new Map();
+    recentlyActiveEdges.value = new Map();
     error.value = null;
     isConnected.value = false;
   }
@@ -269,6 +273,18 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
       const m = new Map(recentlyActive.value);
       m.set(nodeId, Date.now());
       recentlyActive.value = m;
+      // Pulse every existing edge incident to this actor — gives a
+      // visual ripple of "this node just used these connections".
+      const eMap = new Map(recentlyActiveEdges.value);
+      const now = Date.now();
+      for (const e of edges.value) {
+        const s = typeof e.source === "object" ? (e.source as GraphNode).id : (e.source as number);
+        const t = typeof e.target === "object" ? (e.target as GraphNode).id : (e.target as number);
+        if (s === nodeId || t === nodeId) {
+          eMap.set(`${s}-${t}`, now);
+        }
+      }
+      recentlyActiveEdges.value = eMap;
     }
     // Advance counters live
     if (action.platform === "twitter") twitterActions.value += 1;
@@ -416,6 +432,11 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
       if (now - v < 4000) m.set(k, v);
     }
     if (m.size !== recentlyActive.value.size) recentlyActive.value = m;
+    const em = new Map<string, number>();
+    for (const [k, v] of recentlyActiveEdges.value) {
+      if (now - v < 4000) em.set(k, v);
+    }
+    if (em.size !== recentlyActiveEdges.value.size) recentlyActiveEdges.value = em;
   }
   const activeSweepTimer = setInterval(resetActiveMarker, 1000);
   const cleanupSweep = () => clearInterval(activeSweepTimer);
@@ -436,6 +457,7 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
     scenario,
     interactions,
     recentlyActive,
+    recentlyActiveEdges,
     error,
     isConnected,
     lastHeartbeat,
