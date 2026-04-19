@@ -56,7 +56,12 @@ function initSimulation() {
     .force(
       "link",
       forceLink<D3Node, D3Link>()
-        .id((d) => String(d.id))
+        // Return the same type that links carry in source/target
+        // (numbers). Returning String(d.id) here while edges have
+        // numeric source/target means d3 can't match them, treats
+        // the raw number as a node, and crashes in forceLink with
+        // "Cannot create property 'vx' on number '1'".
+        .id((d) => d.id)
         .distance(60)
         .strength(0.3),
     )
