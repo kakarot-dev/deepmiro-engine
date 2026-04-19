@@ -1,15 +1,30 @@
 <script setup lang="ts">
-import { useRoute } from "vue-router";
 import { computed } from "vue";
+import { storeToRefs } from "pinia";
+import { useRoute } from "vue-router";
+import PhaseChip from "@/components/PhaseChip.vue";
 import { useAuth } from "@/composables/useAuth";
+import { useActiveSimStore } from "@/stores/activeSim";
 
 const route = useRoute();
-const activeRoute = computed(() => route.name);
-
 const { mode, userName, userEmail, signInUrl } = useAuth();
+const activeSim = useActiveSimStore();
+const {
+  simId,
+  state,
+  progress,
+  currentRound,
+  totalRounds,
+  profilesCount,
+  expectedProfiles,
+  entitiesCount,
+} = storeToRefs(activeSim);
 
 const isAuthenticated = computed(
   () => mode.value === "session" || mode.value === "api_key",
+);
+const showPhaseChip = computed(
+  () => simId.value && route.name === "sim" && simId.value === route.params.simId,
 );
 </script>
 
@@ -19,45 +34,40 @@ const isAuthenticated = computed(
       <img src="/logo.png" alt="DeepMiro" class="brand-logo" />
     </router-link>
 
+    <div class="phase">
+      <PhaseChip
+        v-if="showPhaseChip"
+        :state="state"
+        :progress="progress"
+        :current-round="currentRound"
+        :total-rounds="totalRounds"
+        :profiles-count="profilesCount"
+        :expected-profiles="expectedProfiles"
+        :entities-count="entitiesCount"
+      />
+    </div>
+
     <nav class="app-nav">
-      <router-link
-        to="/"
-        class="nav-link"
-        :class="{ active: activeRoute === 'setup' }"
-      >
-        New prediction
-      </router-link>
-      <router-link
-        v-if="isAuthenticated"
-        to="/history"
-        class="nav-link"
-        :class="{ active: activeRoute === 'history' }"
-      >
+      <router-link v-if="isAuthenticated" to="/history" class="nav-link">
         History
       </router-link>
-    </nav>
-
-    <div class="app-account">
       <div v-if="mode === 'session'" class="account-chip">
         <span class="account-dot" />
         {{ userName || userEmail || "Signed in" }}
       </div>
-      <a
-        v-else-if="mode === 'unauthenticated'"
-        :href="signInUrl()"
-        class="sign-in"
-      >
+      <a v-else-if="mode === 'unauthenticated'" :href="signInUrl()" class="sign-in">
         Sign in
       </a>
-    </div>
+    </nav>
   </header>
 </template>
 
 <style scoped>
 .app-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--gap-lg);
   padding: 0 var(--gap-lg);
   height: 56px;
   border-bottom: 1px solid var(--border);
@@ -65,60 +75,35 @@ const isAuthenticated = computed(
   z-index: 10;
   position: relative;
 }
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-sm);
-  color: var(--fg-strong);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-.brand:hover {
-  color: var(--fg-strong);
-}
-
+.brand { display: inline-flex; align-items: center; }
 .brand-logo {
-  height: 28px;
+  height: 26px;
   width: auto;
   display: block;
 }
-
+.phase {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .app-nav {
   display: flex;
   align-items: center;
-  gap: var(--gap-xs);
+  gap: var(--gap-sm);
+  margin-left: auto;
 }
-
 .nav-link {
   padding: 6px 14px;
   border-radius: var(--radius-full);
   color: var(--fg-muted);
   font-size: 13px;
   font-weight: 500;
-  transition:
-    color var(--duration-fast) var(--ease-out),
-    background var(--duration-fast) var(--ease-out);
+  transition: all var(--duration-fast) var(--ease-out);
 }
-
 .nav-link:hover {
   color: var(--fg);
   background: var(--card);
 }
-
-.nav-link.active {
-  color: var(--primary);
-  background: var(--primary-muted);
-}
-
-.app-account {
-  display: flex;
-  align-items: center;
-  margin-left: auto;
-  padding-left: var(--gap-md);
-}
-
 .account-chip {
   display: inline-flex;
   align-items: center;
@@ -133,14 +118,12 @@ const isAuthenticated = computed(
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .account-dot {
   width: 7px;
   height: 7px;
-  border-radius: var(--radius-full);
+  border-radius: 50%;
   background: var(--success);
 }
-
 .sign-in {
   padding: 6px 14px;
   background: var(--primary);
@@ -148,10 +131,8 @@ const isAuthenticated = computed(
   border-radius: var(--radius-md);
   font-size: 13px;
   font-weight: 600;
-  transition:
-    background var(--duration-fast) var(--ease-out);
+  transition: background var(--duration-fast) var(--ease-out);
 }
-
 .sign-in:hover {
   background: var(--primary-hover);
   color: var(--bg);

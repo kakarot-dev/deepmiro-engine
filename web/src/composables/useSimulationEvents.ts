@@ -16,6 +16,7 @@ import { SimulationEventStream } from "@/lib/events";
 import { resolveArchetype } from "@/lib/archetypes";
 import type {
   AgentActionRecord,
+  AgentProfile,
   GraphEdge,
   GraphNode,
   LifecycleEvent,
@@ -36,6 +37,9 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
   const actions = ref<AgentActionRecord[]>([]);
   const agents = ref<GraphNode[]>([]);
   const edges = ref<GraphEdge[]>([]);
+  const profiles = ref<AgentProfile[]>([]);
+  // Tracks node IDs that recently posted (for graph glow pulse)
+  const recentlyActive = ref<Map<number, number>>(new Map());
   const error = ref<string | null>(null);
   const isConnected = ref(false);
   const lastHeartbeat = ref<number>(0);
@@ -71,6 +75,8 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
     actions.value = [];
     agents.value = [];
     edges.value = [];
+    profiles.value = [];
+    recentlyActive.value = new Map();
     error.value = null;
     isConnected.value = false;
   }
@@ -97,10 +103,22 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
     // to be fetched on every reconnect.
     try {
       const { getProfiles, getPosts } = await import("@/api/simulation");
-      const [profiles, postResp] = await Promise.all([
-        getProfiles(simId).catch(() => []),
+      // Fetch both platforms — sim might be twitter-only, reddit-only,
+      // or both. Merge by user_id so identical agents only appear once.
+      const [reddit, twitter, postResp] = await Promise.all([
+        getProfiles(simId, "reddit").catch(() => [] as AgentProfile[]),
+        getProfiles(simId, "twitter").catch(() => [] as AgentProfile[]),
         getPosts(simId, 500).catch(() => ({ posts: [], total: 0 })),
       ]);
+      const merged = new Map<number, AgentProfile>();
+      for (const p of [...reddit, ...twitter]) {
+        const id = p.user_id ?? p.agent_id ?? -1;
+        if (id < 0) continue;
+        if (!merged.has(id)) merged.set(id, p);
+      }
+      const fetchedProfiles = [...merged.values()];
+      profiles.value = fetchedProfiles;
+
       const postCountByUser: Record<number, number> = {};
       const lastPostByUser: Record<number, string> = {};
       for (const p of postResp.posts ?? []) {
@@ -109,7 +127,7 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
         postCountByUser[uid] = (postCountByUser[uid] ?? 0) + 1;
         if (!lastPostByUser[uid]) lastPostByUser[uid] = (p as any).content ?? "";
       }
-      const nodes: GraphNode[] = (profiles ?? []).map((p, idx) => {
+      const nodes: GraphNode[] = fetchedProfiles.map((p, idx) => {
         const id = p.user_id ?? p.agent_id ?? idx;
         const name =
           p.realname || p.name || p.username || p.user_name || `Agent ${id}`;
@@ -123,10 +141,6 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
         };
       });
       agents.value = nodes;
-      // Edges: derive follow-graph from OASIS? We don't have a cheap
-      // way to fetch mid-sim. For now, seed with a fully-connected
-      // "mention" graph derived from shared archetype. Frontend
-      // visualization remains meaningful without a real edge list.
       edges.value = buildArchetypeEdges(nodes);
     } catch (err) {
       console.warn("Failed to hydrate agents:", err);
@@ -147,6 +161,10 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
           node.lastPost = content;
         }
       }
+      // Mark active for graph glow pulse
+      const m = new Map(recentlyActive.value);
+      m.set(action.agent_id, Date.now());
+      recentlyActive.value = m;
     }
     // Advance counters live
     if (action.platform === "twitter") twitterActions.value += 1;
@@ -274,6 +292,19 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
     stream = null;
   });
 
+  function resetActiveMarker() {
+    // Drop entries older than 4s so the glow fades out after rounds.
+    const now = Date.now();
+    const m = new Map<number, number>();
+    for (const [k, v] of recentlyActive.value) {
+      if (now - v < 4000) m.set(k, v);
+    }
+    if (m.size !== recentlyActive.value.size) recentlyActive.value = m;
+  }
+  const activeSweepTimer = setInterval(resetActiveMarker, 1000);
+  const cleanupSweep = () => clearInterval(activeSweepTimer);
+  onBeforeUnmount(cleanupSweep);
+
   return {
     snapshot,
     state,
@@ -285,6 +316,8 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
     actions,
     agents,
     edges,
+    profiles,
+    recentlyActive,
     error,
     isConnected,
     lastHeartbeat,
