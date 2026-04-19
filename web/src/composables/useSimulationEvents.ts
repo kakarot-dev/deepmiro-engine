@@ -510,7 +510,13 @@ function fuseEntityWithPersonas(
     const t = idByUuid.get(ed.target_node_uuid);
     if (s == null || t == null || s === t) continue;
     const label = ed.name?.trim() || ed.fact?.trim() || "related";
-    edges.push({ source: s, target: t, type: "fact", label });
+    edges.push({
+      source: s,
+      target: t,
+      type: "fact",
+      label,
+      fact: ed.fact?.trim() || undefined,
+    });
     incident.add(s);
     incident.add(t);
   }
@@ -591,12 +597,9 @@ function injectScenarioHub(
   scenario: ScenarioContext | null,
 ): { nodes: GraphNode[]; edges: GraphEdge[] } {
   if (!scenario || nodes.length === 0) return { nodes, edges };
-  const promptHead = (scenario.prompt || "Scenario").trim();
-  const label =
-    promptHead.length > 60 ? promptHead.slice(0, 60).trim() + "…" : promptHead;
   const hub: GraphNode = {
     id: SCENARIO_HUB_ID,
-    name: label || "Scenario",
+    name: "Scenario",
     archetype: "Scenario",
     post_count: scenario.scenario_facts.length,
     lastPost: scenario.scenario_facts[0] ?? "",
@@ -657,6 +660,8 @@ function layerInteractions(
       target: e.target,
       type: `interaction:${e.kind}`,
       label: lbl,
+      kind: e.kind,
+      weight: e.weight,
     });
   }
   return { nodes, edges: [...edges, ...newEdges] };

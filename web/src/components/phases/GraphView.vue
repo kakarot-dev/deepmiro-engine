@@ -12,7 +12,10 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   recentlyActive: () => new Map<number, number>(),
 });
-const emit = defineEmits<{ select: [agent: GraphNode | null] }>();
+const emit = defineEmits<{
+  select: [agent: GraphNode | null];
+  "select-edge": [edge: GraphEdge | null];
+}>();
 
 const isEmpty = () => props.agents.length === 0;
 </script>
@@ -27,6 +30,7 @@ const isEmpty = () => props.agents.length === 0;
       :edges="edges"
       :recently-active="recentlyActive"
       @select="(a) => emit('select', a)"
+      @select-edge="(e) => emit('select-edge', e)"
     />
   </div>
 </template>

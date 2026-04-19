@@ -7,11 +7,12 @@ import PersonasView from "@/components/phases/PersonasView.vue";
 import SimulatingView from "@/components/phases/SimulatingView.vue";
 import InlineReportView from "@/components/phases/InlineReportView.vue";
 import PersonaSheet from "@/components/PersonaSheet.vue";
+import ConnectionSheet from "@/components/ConnectionSheet.vue";
 import Button from "@/components/ui/Button.vue";
 import { useSimulationEvents } from "@/composables/useSimulationEvents";
 import { cancelSim } from "@/api/simulation";
 import { useActiveSimStore } from "@/stores/activeSim";
-import type { AgentProfile, GraphNode } from "@/types/api";
+import type { AgentProfile, GraphEdge, GraphNode } from "@/types/api";
 
 interface Props {
   simId: string;
@@ -129,6 +130,7 @@ function profileNameOf(p: AgentProfile): string {
 }
 function openSheetForAgent(agent: GraphNode | null) {
   if (!agent) { sheetOpen.value = false; return; }
+  connectionSheetOpen.value = false; // close edge sheet if open
   sheetAgent.value = agent;
   // Match by id first (persona-only graph), then by name (entity graph
   // where ids are hashed from the entity name).
@@ -151,6 +153,17 @@ function openSheetForProfile(profile: AgentProfile) {
     ?? null;
   sheetOpen.value = true;
 }
+// Connection sheet — opens when an edge is clicked. Mutually exclusive
+// with the persona sheet so only one is visible at a time.
+const connectionSheetOpen = ref(false);
+const selectedEdge = ref<GraphEdge | null>(null);
+function openConnectionSheet(edge: GraphEdge | null) {
+  if (!edge) { connectionSheetOpen.value = false; return; }
+  sheetOpen.value = false; // close persona sheet if open
+  selectedEdge.value = edge;
+  connectionSheetOpen.value = true;
+}
+
 const sheetActions = computed(() => {
   // Actions are keyed by the persona's real user_id, never the hashed
   // entity-graph id. Resolve through the matched profile.
@@ -203,7 +216,8 @@ const terminalLabel = computed(() => {
         :edges="edges"
         :snapshot="snapshot"
         :recently-active="recentlyActive"
-        @select="openSheetForAgent"
+        @select="(a) => { openSheetForAgent(a); }"
+        @select-edge="openConnectionSheet"
       />
       <PersonasView
         v-else-if="activeStep === 'personas'"
@@ -241,6 +255,14 @@ const terminalLabel = computed(() => {
       :recent-actions="sheetActions"
       :scenario="scenario"
       @update:open="(v) => (sheetOpen = v)"
+    />
+    <ConnectionSheet
+      :open="connectionSheetOpen"
+      :edge="selectedEdge"
+      :agents="agents"
+      :actions="actions"
+      :scenario="scenario"
+      @update:open="(v) => (connectionSheetOpen = v)"
     />
 
     <div v-if="error && !isTerminal && state !== 'COMPLETED'" class="error-toast">

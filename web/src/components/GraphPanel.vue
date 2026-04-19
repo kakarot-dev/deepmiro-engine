@@ -44,7 +44,10 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   recentlyActive: () => new Map<number, number>(),
 });
-const emit = defineEmits<{ select: [agent: GraphNode | null] }>();
+const emit = defineEmits<{
+  select: [agent: GraphNode | null];
+  "select-edge": [edge: GraphEdge | null];
+}>();
 
 interface D3Node extends GraphNode, SimulationNodeDatum {
   // d3 mutates these
@@ -213,16 +216,29 @@ function initSimulation() {
       "link",
       forceLink<D3Node, D3Link>()
         .id((d) => d.id)
-        // Wider link distance so labels have breathing room. Real
-        // semantic edges (fact) sit closer than synthetic bridges.
-        .distance((l) => (l.type === "fact" ? 180 : l.type === "bridge" ? 230 : 140))
-        .strength((l) => (l.type === "fact" ? 0.4 : l.type === "bridge" ? 0.12 : 0.32)),
+        // Distances bumped 40-60% from prior config for more breathing
+        // room. Scenario "reacts to" edges sit furthest so personas
+        // orbit the hub at a comfortable radius.
+        .distance((l) =>
+          l.type === "scenario" ? 280 :
+          l.type === "fact" ? 240 :
+          l.type === "bridge" ? 320 :
+          l.type?.startsWith("interaction") ? 220 :
+          200, // cluster
+        )
+        .strength((l) =>
+          l.type === "scenario" ? 0.06 :
+          l.type === "fact" ? 0.4 :
+          l.type === "bridge" ? 0.1 :
+          l.type?.startsWith("interaction") ? 0.15 :
+          0.28, // cluster
+        ),
     )
-    // Stronger repulsion + larger reach → nodes spread out
-    .force("charge", forceManyBody().strength(-560).distanceMax(640))
+    // Repulsion further up so nodes stay apart at the new scale
+    .force("charge", forceManyBody().strength(-820).distanceMax(900))
     .force("center", forceCenter(width / 2, height / 2))
     // Bigger collision radius prevents node overlap
-    .force("collide", forceCollide<D3Node>((d) => nodeRadius(d) + 18))
+    .force("collide", forceCollide<D3Node>((d) => nodeRadius(d) + 26))
     // Weaker centering pull so the layout uses the canvas
     .force("x", forceX(width / 2).strength(0.02))
     .force("y", forceY(height / 2).strength(0.02));
@@ -345,14 +361,22 @@ function renderJoin() {
     .attr("stroke-width", 1.4)
     .attr("stroke-linecap", "round")
     .attr("stroke", (d) => `url(#grad-${(d.source as D3Node).id ?? d.source}-${(d.target as D3Node).id ?? d.target})`);
-  // Hover handlers on the parent group so both visible + hit paths fire
+  // Hover + click handlers on the parent group so both visible + hit
+  // paths fire. Click bubbles up via select-edge so the parent view
+  // can open a ConnectionSheet with the edge details.
   linkGroup
     .selectAll<SVGGElement, D3Link>("g.link-group")
+    .style("cursor", "pointer")
     .on("mouseenter", (event, d) => {
       hoveredEdge.value = d;
       showEdgeTooltip(event as MouseEvent, d);
     })
     .on("mousemove", (event) => moveTooltip(event as MouseEvent))
+    .on("click", (event, d) => {
+      event.stopPropagation();
+      hideTooltip();
+      emit("select-edge", d as unknown as GraphEdge);
+    })
     .on("mouseleave", () => {
       hoveredEdge.value = null;
       hideTooltip();

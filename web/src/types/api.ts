@@ -179,4 +179,10 @@ export interface GraphEdge {
   type?: string;
   /** Human-readable label shown on the graph and in the tooltip. */
   label?: string;
+  /** For fact edges: sentence-level fact backing the relation. */
+  fact?: string;
+  /** For interaction edges: count of times this interaction occurred. */
+  weight?: number;
+  /** For interaction edges: kind ("like" | "comment" | "follow" | etc.) */
+  kind?: string;
 }

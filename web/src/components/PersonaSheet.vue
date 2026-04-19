@@ -39,10 +39,37 @@ const meta = computed(() => {
   if (mbti) items.push({ label: "MBTI", value: mbti });
   return items;
 });
-const contentActions = computed(() =>
+/** Friendly verb + content extractor per action type. */
+function describe(a: AgentActionRecord): { verb: string; content?: string; target?: string } {
+  const args = a.action_args as any;
+  switch (a.action_type) {
+    case "CREATE_POST":
+      return { verb: "posted", content: args?.content };
+    case "CREATE_COMMENT":
+      return { verb: "commented", content: args?.content, target: args?.post_id ? `post #${args.post_id}` : undefined };
+    case "QUOTE_POST":
+      return { verb: "quoted", content: args?.content, target: args?.post_id ? `post #${args.post_id}` : undefined };
+    case "REPOST":
+    case "RETWEET":
+      return { verb: "reposted", target: args?.post_id ? `post #${args.post_id}` : undefined };
+    case "LIKE_POST":
+    case "UPVOTE_POST":
+    case "UPVOTE":
+      return { verb: "liked", target: args?.post_id ? `post #${args.post_id}` : undefined };
+    case "FOLLOW":
+      return { verb: "follows", target: args?.followee_id ? `agent #${args.followee_id}` : undefined };
+    case "DO_NOTHING":
+    case "IDLE":
+      return { verb: "idled" };
+    default:
+      return { verb: a.action_type.toLowerCase().replace(/_/g, " ") };
+  }
+}
+const allActions = computed(() => props.recentActions.slice(0, 25));
+const postCount = computed(() =>
   props.recentActions.filter((a) =>
     ["CREATE_POST", "CREATE_COMMENT", "QUOTE_POST"].includes(a.action_type),
-  ),
+  ).length,
 );
 </script>
 
@@ -109,17 +136,19 @@ const contentActions = computed(() =>
 
       <div class="section">
         <div class="section-title">
-          Recent posts
-          <span class="post-count">{{ contentActions.length }}</span>
+          Recent activity
+          <span class="post-count">{{ allActions.length }}<span v-if="postCount" class="dim"> · {{ postCount }} posts</span></span>
         </div>
-        <div v-if="contentActions.length === 0" class="empty">No posts yet.</div>
+        <div v-if="allActions.length === 0" class="empty">No activity yet.</div>
         <div v-else class="posts">
-          <div v-for="(a, i) in contentActions.slice(0, 8)" :key="i" class="post">
+          <div v-for="(a, i) in allActions" :key="i" class="post">
             <div class="post-meta">
-              <Badge variant="muted">{{ a.platform }}</Badge>
+              <Badge variant="muted">{{ describe(a).verb }}</Badge>
+              <Badge v-if="a.platform" variant="outline">{{ a.platform }}</Badge>
               <span>round {{ a.round }}</span>
+              <span v-if="describe(a).target" class="target">→ {{ describe(a).target }}</span>
             </div>
-            <div class="post-content">{{ a.action_args?.content }}</div>
+            <div v-if="describe(a).content" class="post-content">{{ describe(a).content }}</div>
           </div>
         </div>
       </div>
@@ -237,6 +266,8 @@ const contentActions = computed(() =>
   white-space: pre-wrap;
   word-wrap: break-word;
 }
+.dim { color: var(--fg-subtle); font-weight: 400; }
+.target { color: var(--fg-subtle); font-size: 11px; }
 .hub-icon {
   width: 56px;
   height: 56px;
