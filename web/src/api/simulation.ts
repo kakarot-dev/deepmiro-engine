@@ -133,6 +133,52 @@ export async function getProfiles(
   return data.data?.profiles ?? [];
 }
 
+export interface ScenarioContext {
+  simulation_id: string;
+  prompt: string;
+  scenario_facts: string[];
+  hot_topics: string[];
+  narrative_direction: string;
+  initial_posts: Array<{ user_id?: number; content?: string }>;
+}
+
+/** Scenario hub data — facts every agent reads, used as the graph's
+ *  central hub node. */
+export async function getScenario(simId: string): Promise<ScenarioContext | null> {
+  try {
+    const { data } = await http.get<Envelope<ScenarioContext>>(
+      `/api/simulation/${simId}/scenario`,
+    );
+    return data.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export interface InteractionEdge {
+  source: number;
+  target: number;
+  kind: "like" | "comment" | "follow" | "repost" | "quote";
+  platform: "twitter" | "reddit";
+  weight: number;
+}
+
+/** Aggregated agent → agent interaction edges (likes, comments,
+ *  follows, etc.) for the live graph layer. */
+export async function getInteractions(
+  simId: string,
+  limit = 500,
+): Promise<InteractionEdge[]> {
+  try {
+    const { data } = await http.get<
+      Envelope<{ edges: InteractionEdge[]; count: number }>
+    >(`/api/simulation/${simId}/interactions`, { params: { limit } });
+    return data.data?.edges ?? [];
+  } catch {
+    return [];
+  }
+}
+
 /** Posts for a simulation (actual content). */
 export async function getPosts(simId: string, limit = 50): Promise<{ posts: Array<{ user_id: number; content: string; num_likes?: number }>; total: number }> {
   const { data } = await http.get<Envelope<{ posts: Array<{ user_id: number; content: string; num_likes?: number }>; total: number }>>(

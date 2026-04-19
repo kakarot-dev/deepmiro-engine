@@ -23,6 +23,11 @@ import type {
   SimSnapshot,
   SimState,
 } from "@/types/api";
+import type { InteractionEdge, ScenarioContext } from "@/api/simulation";
+
+// Sentinel id for the synthetic Scenario hub node. Picked above any
+// possible persona user_id range and any name-hash collision range.
+export const SCENARIO_HUB_ID = 0x7fffffff;
 
 const ACTION_FEED_CAP = 400;
 
@@ -38,6 +43,8 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
   const agents = ref<GraphNode[]>([]);
   const edges = ref<GraphEdge[]>([]);
   const profiles = ref<AgentProfile[]>([]);
+  const scenario = ref<ScenarioContext | null>(null);
+  const interactions = ref<InteractionEdge[]>([]);
   // Tracks node IDs that recently posted (for graph glow pulse)
   const recentlyActive = ref<Map<number, number>>(new Map());
   const error = ref<string | null>(null);
@@ -76,9 +83,56 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
     agents.value = [];
     edges.value = [];
     profiles.value = [];
+    scenario.value = null;
+    interactions.value = [];
     recentlyActive.value = new Map();
     error.value = null;
     isConnected.value = false;
+  }
+
+  async function hydrateScenario(simId: string) {
+    try {
+      const { getScenario } = await import("@/api/simulation");
+      const s = await getScenario(simId);
+      if (s) scenario.value = s;
+    } catch (err) {
+      console.warn("scenario fetch failed:", err);
+    }
+  }
+
+  async function hydrateInteractions(simId: string) {
+    try {
+      const { getInteractions } = await import("@/api/simulation");
+      const list = await getInteractions(simId);
+      interactions.value = list;
+      // Re-fuse the graph so interaction edges show up
+      rebuildGraph();
+    } catch (err) {
+      console.warn("interactions fetch failed:", err);
+    }
+  }
+
+  let interactionPollTimer: ReturnType<typeof setInterval> | null = null;
+  function startInteractionPoll(simId: string) {
+    if (interactionPollTimer) clearInterval(interactionPollTimer);
+    interactionPollTimer = setInterval(() => hydrateInteractions(simId), 4000);
+  }
+  function stopInteractionPoll() {
+    if (interactionPollTimer) {
+      clearInterval(interactionPollTimer);
+      interactionPollTimer = null;
+    }
+  }
+
+  // Snapshot of last fused inputs so we can rebuild after interactions
+  // change without re-fetching everything.
+  let lastFusedNodes: GraphNode[] = [];
+  let lastFusedEdges: GraphEdge[] = [];
+  function rebuildGraph() {
+    const withHub = injectScenarioHub(lastFusedNodes, lastFusedEdges, scenario.value);
+    const withInteractions = layerInteractions(withHub.nodes, withHub.edges, interactions.value);
+    agents.value = withInteractions.nodes;
+    edges.value = withInteractions.edges;
   }
 
   function applySnapshot(snap: SimSnapshot) {
@@ -170,12 +224,13 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
       }
 
       if (fused) {
-        agents.value = fused.nodes;
-        edges.value = fused.edges;
+        lastFusedNodes = fused.nodes;
+        lastFusedEdges = fused.edges;
       } else {
-        agents.value = personaNodes;
-        edges.value = buildArchetypeEdges(personaNodes);
+        lastFusedNodes = personaNodes;
+        lastFusedEdges = buildArchetypeEdges(personaNodes);
       }
+      rebuildGraph();
     } catch (err) {
       console.warn("Failed to hydrate agents:", err);
     }
@@ -235,10 +290,14 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
         // post counts up to date.
         hydrateAgents(simIdRef.value);
         stopProfilePoll();
+        startInteractionPoll(simIdRef.value);
       } else if (
         ["COMPLETED", "FAILED", "CANCELLED", "INTERRUPTED"].includes(newState)
       ) {
         stopProfilePoll();
+        // One last interactions sync to capture final state
+        hydrateInteractions(simIdRef.value);
+        stopInteractionPoll();
       }
     }
   }
@@ -323,6 +382,13 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
           startProfilePoll(simId);
         }
       }
+      // Scenario hub + interactions are useful from GRAPH_BUILDING
+      // onward (event_config exists once the config is written).
+      hydrateScenario(simId);
+      hydrateInteractions(simId);
+      if (["SIMULATING", "READY"].includes(snap.state)) {
+        startInteractionPoll(simId);
+      }
       openStream(simId);
     } catch (err: any) {
       error.value = err?.message ?? "Failed to load simulation";
@@ -337,6 +403,7 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
 
   onBeforeUnmount(() => {
     stopProfilePoll();
+    stopInteractionPoll();
     stream?.close();
     stream = null;
   });
@@ -366,6 +433,8 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
     agents,
     edges,
     profiles,
+    scenario,
+    interactions,
     recentlyActive,
     error,
     isConnected,
@@ -504,6 +573,93 @@ function fuseEntityWithPersonas(
   }
 
   return { nodes, edges };
+}
+
+/**
+ * Inject the synthetic Scenario hub. The hub represents `event_config`
+ * — the scenario_facts every agent reads when the sim starts. Drawn
+ * distinctively in GraphPanel and pinned to the canvas center via the
+ * special id `SCENARIO_HUB_ID`.
+ *
+ * Connects every persona node to the hub via a soft "reacts to" edge
+ * so the graph reads as: "here's what happened → here are the people
+ * reacting to it".
+ */
+function injectScenarioHub(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  scenario: ScenarioContext | null,
+): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  if (!scenario || nodes.length === 0) return { nodes, edges };
+  const promptHead = (scenario.prompt || "Scenario").trim();
+  const label =
+    promptHead.length > 60 ? promptHead.slice(0, 60).trim() + "…" : promptHead;
+  const hub: GraphNode = {
+    id: SCENARIO_HUB_ID,
+    name: label || "Scenario",
+    archetype: "Scenario",
+    post_count: scenario.scenario_facts.length,
+    lastPost: scenario.scenario_facts[0] ?? "",
+  };
+  const reactsEdges: GraphEdge[] = nodes.map((n) => ({
+    source: SCENARIO_HUB_ID,
+    target: n.id,
+    type: "scenario",
+    label: "reacts to",
+  }));
+  return {
+    nodes: [hub, ...nodes],
+    edges: [...edges, ...reactsEdges],
+  };
+}
+
+/**
+ * Layer real inter-agent interactions (likes, comments, follows,
+ * quotes, reposts) on top of the static graph. Each interaction edge
+ * is colored by kind in GraphPanel and weighted thicker as it accrues.
+ *
+ * Edges are de-duped per (source, target, kind). When the same edge
+ * also exists as a fact/cluster/bridge layer, the interaction edge is
+ * still drawn — different visual layer.
+ */
+function layerInteractions(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  inters: InteractionEdge[],
+): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  if (!inters.length) return { nodes, edges };
+  const ids = new Set(nodes.map((n) => n.id));
+  // Aggregate across platforms for the same (src, tgt, kind) tuple
+  const agg = new Map<string, { source: number; target: number; kind: string; weight: number }>();
+  for (const i of inters) {
+    if (!ids.has(i.source) || !ids.has(i.target)) continue;
+    const key = `${i.source}-${i.target}-${i.kind}`;
+    const cur = agg.get(key);
+    if (cur) cur.weight += i.weight;
+    else agg.set(key, { source: i.source, target: i.target, kind: i.kind, weight: i.weight });
+  }
+  const verb: Record<string, string> = {
+    like: "liked",
+    comment: "commented on",
+    follow: "follows",
+    repost: "reposted",
+    quote: "quoted",
+  };
+  const nameById = new Map(nodes.map((n) => [n.id, n.name]));
+  const newEdges: GraphEdge[] = [];
+  for (const e of agg.values()) {
+    const sName = nameById.get(e.source) ?? `#${e.source}`;
+    const tName = nameById.get(e.target) ?? `#${e.target}`;
+    const v = verb[e.kind] ?? e.kind;
+    const lbl = e.weight > 1 ? `${sName} ${v} ${tName} ${e.weight}×` : `${sName} ${v} ${tName}`;
+    newEdges.push({
+      source: e.source,
+      target: e.target,
+      type: `interaction:${e.kind}`,
+      label: lbl,
+    });
+  }
+  return { nodes, edges: [...edges, ...newEdges] };
 }
 
 function buildArchetypeEdges(nodes: GraphNode[]): GraphEdge[] {

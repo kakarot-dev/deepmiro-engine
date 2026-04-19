@@ -1001,6 +1001,106 @@ def get_simulation_history():
         }), 500
 
 
+@simulation_bp.route('/<simulation_id>/scenario', methods=['GET'])
+def get_simulation_scenario(simulation_id: str):
+    """Return the scenario hub data — event_config (scenario_facts,
+    hot_topics, narrative_direction, initial_posts) plus a summary of
+    the original prompt. This is what the live graph hub renders.
+    """
+    import json
+    try:
+        sim_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id)
+        cfg_path = os.path.join(sim_dir, "simulation_config.json")
+        if not os.path.exists(cfg_path):
+            return jsonify({"success": False, "error": "Simulation config not found"}), 404
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        evt = cfg.get("event_config", {}) or {}
+        return jsonify({
+            "success": True,
+            "data": {
+                "simulation_id": simulation_id,
+                "prompt": cfg.get("simulation_requirement") or cfg.get("prompt") or "",
+                "scenario_facts": evt.get("scenario_facts") or [],
+                "hot_topics": evt.get("hot_topics") or [],
+                "narrative_direction": evt.get("narrative_direction") or "",
+                "initial_posts": evt.get("initial_posts") or [],
+            },
+        })
+    except Exception as e:
+        logger.error(f"Failed to load scenario: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@simulation_bp.route('/<simulation_id>/interactions', methods=['GET'])
+def get_simulation_interactions(simulation_id: str):
+    """Aggregate inter-agent interactions across both platform DBs.
+    Joins through the `post` table to resolve like/comment/repost
+    targets. Returns weighted edges for the graph view's interaction
+    layer.
+
+    Query: limit (default 200)
+    Returns: {edges: [{source, target, kind, weight, platform}]}
+    """
+    import sqlite3
+    try:
+        limit = request.args.get('limit', 500, type=int)
+        sim_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id)
+
+        agg: dict[tuple[int, int, str, str], int] = {}
+
+        for platform, db_name in (("twitter", "twitter_simulation.db"),
+                                   ("reddit", "reddit_simulation.db")):
+            db_path = os.path.join(sim_dir, db_name)
+            if not os.path.exists(db_path):
+                continue
+            conn = sqlite3.connect(db_path)
+            try:
+                # like → post.user_id
+                for actor, target in conn.execute(
+                    "SELECT l.user_id, p.user_id FROM like l "
+                    "JOIN post p ON l.post_id = p.post_id"
+                ):
+                    if actor != target:
+                        agg[(actor, target, "like", platform)] = (
+                            agg.get((actor, target, "like", platform), 0) + 1
+                        )
+                # comment → post.user_id
+                for actor, target in conn.execute(
+                    "SELECT c.user_id, p.user_id FROM comment c "
+                    "JOIN post p ON c.post_id = p.post_id"
+                ):
+                    if actor != target:
+                        agg[(actor, target, "comment", platform)] = (
+                            agg.get((actor, target, "comment", platform), 0) + 1
+                        )
+                # follow
+                try:
+                    for actor, target in conn.execute(
+                        "SELECT follower_id, followee_id FROM follow"
+                    ):
+                        if actor != target:
+                            agg[(actor, target, "follow", platform)] = (
+                                agg.get((actor, target, "follow", platform), 0) + 1
+                            )
+                except sqlite3.OperationalError:
+                    pass  # follow table may not exist on reddit
+            finally:
+                conn.close()
+
+        edges = [
+            {"source": s, "target": t, "kind": k, "platform": p, "weight": w}
+            for (s, t, k, p), w in agg.items()
+        ]
+        # Heaviest edges first, capped
+        edges.sort(key=lambda e: -e["weight"])
+        edges = edges[:limit]
+        return jsonify({"success": True, "data": {"edges": edges, "count": len(edges)}})
+    except Exception as e:
+        logger.error(f"Failed to aggregate interactions: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @simulation_bp.route('/<simulation_id>/profiles', methods=['GET'])
 def get_simulation_profiles(simulation_id: str):
     """

@@ -31,6 +31,7 @@ const {
   agents,
   edges,
   profiles,
+  scenario,
   recentlyActive,
   error,
 } = useSimulationEvents(simIdRef);
@@ -238,6 +239,7 @@ const terminalLabel = computed(() => {
       :agent="sheetAgent"
       :profile="sheetProfile"
       :recent-actions="sheetActions"
+      :scenario="scenario"
       @update:open="(v) => (sheetOpen = v)"
     />
 

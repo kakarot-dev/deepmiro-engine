@@ -5,6 +5,7 @@ import Avatar from "@/components/ui/Avatar.vue";
 import Badge from "@/components/ui/Badge.vue";
 import { resolveArchetype } from "@/lib/archetypes";
 import type { AgentActionRecord, AgentProfile, GraphNode } from "@/types/api";
+import type { ScenarioContext } from "@/api/simulation";
 
 interface Props {
   open: boolean;
@@ -12,7 +13,11 @@ interface Props {
   profile: AgentProfile | null;
   /** Recent actions by this agent — pre-filtered upstream. */
   recentActions: AgentActionRecord[];
+  /** When the clicked node is the scenario hub, pass the full scenario
+   *  context so the sheet renders facts + topics instead of bio. */
+  scenario?: ScenarioContext | null;
 }
+const isHub = computed(() => props.agent?.archetype === "Scenario");
 const props = defineProps<Props>();
 const emit = defineEmits<{ "update:open": [value: boolean] }>();
 
@@ -47,7 +52,36 @@ const contentActions = computed(() =>
     :width="'420px'"
     @update:open="(v) => emit('update:open', v)"
   >
-    <div v-if="agent || profile" class="sheet-content">
+    <div v-if="isHub && scenario" class="sheet-content">
+      <div class="head">
+        <div class="hub-icon">★</div>
+        <div class="head-text">
+          <div class="name">Scenario</div>
+          <Badge color="#22d3ee">World state</Badge>
+        </div>
+      </div>
+      <p v-if="scenario.prompt" class="bio">{{ scenario.prompt }}</p>
+      <div v-if="scenario.scenario_facts.length" class="section">
+        <div class="section-title">
+          Facts every agent knows
+          <span class="post-count">{{ scenario.scenario_facts.length }}</span>
+        </div>
+        <ol class="facts">
+          <li v-for="(f, i) in scenario.scenario_facts" :key="i" class="fact">{{ f }}</li>
+        </ol>
+      </div>
+      <div v-if="scenario.hot_topics.length" class="section">
+        <div class="section-title">Hot topics</div>
+        <div class="chip-row">
+          <span v-for="t in scenario.hot_topics" :key="t" class="chip">{{ t }}</span>
+        </div>
+      </div>
+      <div v-if="scenario.narrative_direction" class="section">
+        <div class="section-title">Narrative direction</div>
+        <p class="bio">{{ scenario.narrative_direction }}</p>
+      </div>
+    </div>
+    <div v-else-if="agent || profile" class="sheet-content">
       <div class="head">
         <Avatar :name="name" :color="archetype.color" :size="56" />
         <div class="head-text">
@@ -202,5 +236,31 @@ const contentActions = computed(() =>
   color: var(--fg);
   white-space: pre-wrap;
   word-wrap: break-word;
+}
+.hub-icon {
+  width: 56px;
+  height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22d3ee, #0891b2);
+  color: var(--bg);
+  font-size: 28px;
+  font-weight: 700;
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.45);
+  flex-shrink: 0;
+}
+.facts {
+  margin: 0;
+  padding-left: var(--gap-md);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fact {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--fg);
 }
 </style>

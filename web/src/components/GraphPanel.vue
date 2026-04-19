@@ -119,12 +119,24 @@ let nodesData: D3Node[] = [];
 let linksData: D3Link[] = [];
 const nodeMap = new Map<number, D3Node>();
 
+function isHub(n: D3Node): boolean {
+  return n.archetype === "Scenario";
+}
 function nodeRadius(n: D3Node): number {
+  if (isHub(n)) return 22; // larger central anchor
   return Math.min(28, 10 + Math.sqrt(Math.max(0, n.post_count)) * 2.4);
 }
 function nodeColor(n: D3Node): string {
+  if (isHub(n)) return "#22d3ee"; // primary cyan
   return resolveArchetype(n.archetype).color;
 }
+const INTERACTION_COLORS: Record<string, string> = {
+  "interaction:like": "#facc15",     // amber
+  "interaction:comment": "#fb923c",  // coral
+  "interaction:follow": "#4ade80",   // mint
+  "interaction:repost": "#818cf8",   // indigo
+  "interaction:quote": "#f472b6",    // rose
+};
 function isActive(n: D3Node): boolean {
   const ts = props.recentlyActive.get(n.id);
   if (!ts) return false;
@@ -243,19 +255,26 @@ function updateGraph() {
   nodeMap.clear();
   for (const n of nodesData) nodeMap.set(n.id, n);
   // Add new / update existing
+  const rect = container.value?.getBoundingClientRect();
+  const cx = (rect?.width ?? 1280) / 2;
+  const cy = (rect?.height ?? 720) / 2;
   for (const agent of props.agents) {
     const existing = nodeMap.get(agent.id);
+    const isHub = agent.archetype === "Scenario";
     if (existing) {
       Object.assign(existing, agent, {
         x: existing.x,
         y: existing.y,
         vx: existing.vx,
         vy: existing.vy,
-        fx: existing.fx,
-        fy: existing.fy,
+        fx: isHub ? cx : existing.fx,
+        fy: isHub ? cy : existing.fy,
       });
     } else {
       const node: D3Node = { ...agent };
+      if (isHub) {
+        node.x = cx; node.y = cy; node.fx = cx; node.fy = cy;
+      }
       nodesData.push(node);
       nodeMap.set(agent.id, node);
     }
@@ -432,13 +451,30 @@ function tick() {
     .attr("x2", (d) => (d.target as D3Node).x ?? 0)
     .attr("y2", (d) => (d.target as D3Node).y ?? 0);
 
+  // Edge color: interaction edges use a flat kind color; scenario
+  // edges use a dim gold; everything else gradients between source
+  // and target node colors.
+  function srcColor(d: D3Link): string {
+    if (d.type && d.type.startsWith("interaction:")) {
+      return INTERACTION_COLORS[d.type] ?? "#94a3b8";
+    }
+    if (d.type === "scenario") return "#22d3ee";
+    return nodeColor(d.source as D3Node);
+  }
+  function tgtColor(d: D3Link): string {
+    if (d.type && d.type.startsWith("interaction:")) {
+      return INTERACTION_COLORS[d.type] ?? "#94a3b8";
+    }
+    if (d.type === "scenario") return "#22d3ee";
+    return nodeColor(d.target as D3Node);
+  }
   defs
     .selectAll<SVGStopElement, D3Link>("stop.stop-source")
-    .attr("stop-color", (d) => nodeColor(d.source as D3Node))
+    .attr("stop-color", (d) => srcColor(d))
     .attr("stop-opacity", (d) => edgeOpacity(d));
   defs
     .selectAll<SVGStopElement, D3Link>("stop.stop-target")
-    .attr("stop-color", (d) => nodeColor(d.target as D3Node))
+    .attr("stop-color", (d) => tgtColor(d))
     .attr("stop-opacity", (d) => edgeOpacity(d));
 
   // Curved bezier paths — apply same `d` to both visible + hit paths
@@ -482,18 +518,23 @@ function tick() {
   nodeSel
     .select<SVGCircleElement>("circle.node-fill")
     .attr("r", (d) => nodeRadius(d) * (selectedId.value === d.id ? 1.18 : 1))
+    .attr("fill", (d) => nodeColor(d))
     .attr("stroke", (d) =>
-      selectedId.value === d.id
-        ? "var(--primary)"
-        : hoveredId.value === d.id
-          ? "rgba(255,255,255,1)"
-          : "rgba(255,255,255,0.7)",
+      isHub(d)
+        ? "#fbbf24" // gold ring for the scenario hub
+        : selectedId.value === d.id
+          ? "var(--primary)"
+          : hoveredId.value === d.id
+            ? "rgba(255,255,255,1)"
+            : "rgba(255,255,255,0.7)",
     )
-    .attr("stroke-width", (d) => (selectedId.value === d.id ? 2.5 : 1.5));
+    .attr("stroke-width", (d) => (isHub(d) ? 3 : selectedId.value === d.id ? 2.5 : 1.5));
   nodeSel
     .select<SVGCircleElement>("circle.node-glow")
+    .attr("fill", (d) => nodeColor(d))
     .attr("r", (d) => nodeRadius(d) * 1.9)
     .attr("opacity", (d) => {
+      if (isHub(d)) return 0.4;       // always slightly glowing
       if (selectedId.value === d.id) return 0.55;
       if (isActive(d)) return 0.45;
       if (hoveredId.value === d.id) return 0.35;
@@ -533,9 +574,14 @@ let resizeObserver: ResizeObserver | null = null;
 function resize() {
   if (!simulation || !container.value) return;
   const rect = container.value.getBoundingClientRect();
-  (simulation.force("center") as any).x(rect.width / 2).y(rect.height / 2);
-  (simulation.force("x") as any).x(rect.width / 2);
-  (simulation.force("y") as any).y(rect.height / 2);
+  const cx = rect.width / 2, cy = rect.height / 2;
+  (simulation.force("center") as any).x(cx).y(cy);
+  (simulation.force("x") as any).x(cx);
+  (simulation.force("y") as any).y(cy);
+  // Re-pin the hub to the new center
+  for (const n of nodesData) {
+    if (isHub(n)) { n.fx = cx; n.fy = cy; }
+  }
   simulation.alpha(0.2).restart();
 }
 
