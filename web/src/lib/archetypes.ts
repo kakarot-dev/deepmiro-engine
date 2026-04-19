@@ -13,55 +13,55 @@ export interface Archetype {
 }
 
 const ARCHETYPE_MAP: Record<string, Archetype> = {
-  TechCEO: { label: "Tech CEO", color: "var(--arch-tech)" },
-  TechExecutive: { label: "Tech Exec", color: "var(--arch-tech)" },
-  TechBillionaire: { label: "Tech Billionaire", color: "var(--arch-tech)" },
-  PlatformCompany: { label: "Platform", color: "var(--arch-platform)" },
-  PlatformCeo: { label: "Platform CEO", color: "var(--arch-tech)" },
-  PlatformModerator: { label: "Moderator", color: "var(--arch-community)" },
+  TechCEO: { label: "Tech CEO", color: "#2dd4bf" },
+  TechExecutive: { label: "Tech Exec", color: "#2dd4bf" },
+  TechBillionaire: { label: "Tech Billionaire", color: "#2dd4bf" },
+  PlatformCompany: { label: "Platform", color: "#818cf8" },
+  PlatformCeo: { label: "Platform CEO", color: "#2dd4bf" },
+  PlatformModerator: { label: "Moderator", color: "#f472b6" },
 
-  Journalist: { label: "Journalist", color: "var(--arch-media)" },
-  TechJournalist: { label: "Tech Journalist", color: "var(--arch-media)" },
-  MediaPersonality: { label: "Media", color: "var(--arch-media)" },
-  PoliticalCommentator: { label: "Commentator", color: "var(--arch-media)" },
+  Journalist: { label: "Journalist", color: "#fb923c" },
+  TechJournalist: { label: "Tech Journalist", color: "#fb923c" },
+  MediaPersonality: { label: "Media", color: "#fb923c" },
+  PoliticalCommentator: { label: "Commentator", color: "#fb923c" },
 
-  Politician: { label: "Politician", color: "var(--arch-politician)" },
-  GovernmentOfficial: { label: "Gov't Official", color: "var(--arch-politician)" },
-  RegulatoryBody: { label: "Regulator", color: "var(--arch-politician)" },
+  Politician: { label: "Politician", color: "#c084fc" },
+  GovernmentOfficial: { label: "Gov't Official", color: "#c084fc" },
+  RegulatoryBody: { label: "Regulator", color: "#c084fc" },
 
-  AdvocacyGroup: { label: "Advocacy", color: "var(--arch-activist)" },
-  DigitalRightsOrganization: { label: "Digital Rights", color: "var(--arch-activist)" },
-  CivilLibertiesGroup: { label: "Civil Rights", color: "var(--arch-activist)" },
+  AdvocacyGroup: { label: "Advocacy", color: "#4ade80" },
+  DigitalRightsOrganization: { label: "Digital Rights", color: "#4ade80" },
+  CivilLibertiesGroup: { label: "Civil Rights", color: "#4ade80" },
 
-  Corporation: { label: "Corporation", color: "var(--arch-business)" },
-  Company: { label: "Company", color: "var(--arch-business)" },
-  Brand: { label: "Brand", color: "var(--arch-business)" },
-  Advertiser: { label: "Advertiser", color: "var(--arch-business)" },
+  Corporation: { label: "Corporation", color: "#facc15" },
+  Company: { label: "Company", color: "#facc15" },
+  Brand: { label: "Brand", color: "#facc15" },
+  Advertiser: { label: "Advertiser", color: "#facc15" },
 
-  AppDeveloper: { label: "Developer", color: "var(--arch-developer)" },
-  Developer: { label: "Developer", color: "var(--arch-developer)" },
+  AppDeveloper: { label: "Developer", color: "#a3e635" },
+  Developer: { label: "Developer", color: "#a3e635" },
 
-  AcademicResearcher: { label: "Researcher", color: "var(--arch-researcher)" },
-  Scientist: { label: "Scientist", color: "var(--arch-researcher)" },
-  Professor: { label: "Professor", color: "var(--arch-researcher)" },
+  AcademicResearcher: { label: "Researcher", color: "#7dd3fc" },
+  Scientist: { label: "Scientist", color: "#7dd3fc" },
+  Professor: { label: "Professor", color: "#7dd3fc" },
 
-  Subreddit: { label: "Subreddit", color: "var(--arch-community)" },
-  Community: { label: "Community", color: "var(--arch-community)" },
-  AlternativePlatform: { label: "Alt Platform", color: "var(--arch-community)" },
+  Subreddit: { label: "Subreddit", color: "#f472b6" },
+  Community: { label: "Community", color: "#f472b6" },
+  AlternativePlatform: { label: "Alt Platform", color: "#f472b6" },
 
-  VentureCapitalist: { label: "VC", color: "var(--arch-business)" },
-  FinancialAnalyst: { label: "Analyst", color: "var(--arch-business)" },
+  VentureCapitalist: { label: "VC", color: "#facc15" },
+  FinancialAnalyst: { label: "Analyst", color: "#facc15" },
 
-  Student: { label: "Student", color: "var(--arch-person)" },
-  Person: { label: "Person", color: "var(--arch-person)" },
-  PowerUser: { label: "Power User", color: "var(--arch-community)" },
-  ContentCreator: { label: "Creator", color: "var(--arch-media)" },
-  RedditCoFounder: { label: "Co-founder", color: "var(--arch-tech)" },
+  Student: { label: "Student", color: "#cbd5e1" },
+  Person: { label: "Person", color: "#cbd5e1" },
+  PowerUser: { label: "Power User", color: "#f472b6" },
+  ContentCreator: { label: "Creator", color: "#fb923c" },
+  RedditCoFounder: { label: "Co-founder", color: "#2dd4bf" },
 };
 
 const DEFAULT_ARCHETYPE: Archetype = {
   label: "Other",
-  color: "var(--arch-person)",
+  color: "#cbd5e1",
 };
 
 export function resolveArchetype(entityType?: string): Archetype {

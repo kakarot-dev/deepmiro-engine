@@ -24,7 +24,7 @@ import type {
   SimState,
 } from "@/types/api";
 
-const ACTION_FEED_CAP = 80;
+const ACTION_FEED_CAP = 400;
 
 export function useSimulationEvents(simIdRef: Ref<string>) {
   const snapshot = ref<SimSnapshot | null>(null);

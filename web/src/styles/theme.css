@@ -36,17 +36,18 @@
   --danger: #ef4444;
   --info: #3b82f6;
 
-  /* Archetype palette (graph node colors, chip backgrounds) */
-  --arch-tech: #22d3ee;        /* TechCEO, TechExecutive */
-  --arch-politician: #a78bfa;  /* Politician, Government */
-  --arch-media: #f97316;       /* Journalist, Media */
-  --arch-activist: #22c55e;    /* AdvocacyGroup, ACLU */
-  --arch-business: #fbbf24;    /* Corporation, Brand */
-  --arch-developer: #84cc16;   /* AppDeveloper */
-  --arch-researcher: #38bdf8;  /* AcademicResearcher */
-  --arch-community: #ec4899;   /* Subreddit, Community */
-  --arch-platform: #60a5fa;    /* PlatformCompany */
-  --arch-person: #94a3b8;      /* Fallback */
+  /* Archetype palette — tuned for dark theme. Slightly desaturated,
+     distinct hues that survive radial-gradient lightening. */
+  --arch-tech: #2dd4bf;        /* teal — Tech CEOs / Execs */
+  --arch-politician: #c084fc;  /* lavender — Politicians, Government */
+  --arch-media: #fb923c;       /* coral-orange — Journalists, Media */
+  --arch-activist: #4ade80;    /* mint-green — Advocacy, Civil Rights */
+  --arch-business: #facc15;    /* amber-gold — Corporations, Brands */
+  --arch-developer: #a3e635;   /* lime — Developers */
+  --arch-researcher: #7dd3fc;  /* sky-blue — Researchers, Academia */
+  --arch-community: #f472b6;   /* rose-pink — Subreddits, Communities */
+  --arch-platform: #818cf8;    /* indigo — Platforms */
+  --arch-person: #cbd5e1;      /* warm slate — fallback */
 
   /* Spacing scale */
   --gap-xs: 4px;

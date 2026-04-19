@@ -132,33 +132,10 @@ function isActive(n: D3Node): boolean {
 }
 
 const visibleLabels = computed<D3Node[]>(() => {
-  // Show labels for: hovered, selected, neighbors of selected, and
-  // the top-6 most-active nodes overall.
-  const out = new Map<number, D3Node>();
-  const sortedByActivity = [...nodesData]
-    .sort((a, b) => (b.post_count ?? 0) - (a.post_count ?? 0))
-    .slice(0, 6);
-  for (const n of sortedByActivity) out.set(n.id, n);
-  if (hoveredId.value !== null) {
-    const h = nodeMap.get(hoveredId.value);
-    if (h) out.set(h.id, h);
-  }
-  if (selectedId.value !== null) {
-    const sel = nodeMap.get(selectedId.value);
-    if (sel) out.set(sel.id, sel);
-    for (const e of linksData) {
-      const s = (e.source as D3Node).id ?? (e.source as number);
-      const t = (e.target as D3Node).id ?? (e.target as number);
-      if (s === selectedId.value) {
-        const n = nodeMap.get(t as number);
-        if (n) out.set(n.id, n);
-      } else if (t === selectedId.value) {
-        const n = nodeMap.get(s as number);
-        if (n) out.set(n.id, n);
-      }
-    }
-  }
-  return [...out.values()];
+  // Show every node's label. The graph is meant to be readable at a
+  // glance — hiding labels behind hover-only created the impression
+  // that personas were "missing".
+  return [...nodesData];
 });
 
 const visibleEdges = computed<D3Link[]>(() => {
@@ -223,14 +200,19 @@ function initSimulation() {
       "link",
       forceLink<D3Node, D3Link>()
         .id((d) => d.id)
-        .distance((l) => (l.type === "bridge" ? 140 : 80))
-        .strength((l) => (l.type === "bridge" ? 0.15 : 0.4)),
+        // Wider link distance so labels have breathing room. Real
+        // semantic edges (fact) sit closer than synthetic bridges.
+        .distance((l) => (l.type === "fact" ? 180 : l.type === "bridge" ? 230 : 140))
+        .strength((l) => (l.type === "fact" ? 0.4 : l.type === "bridge" ? 0.12 : 0.32)),
     )
-    .force("charge", forceManyBody().strength(-280).distanceMax(360))
+    // Stronger repulsion + larger reach → nodes spread out
+    .force("charge", forceManyBody().strength(-560).distanceMax(640))
     .force("center", forceCenter(width / 2, height / 2))
-    .force("collide", forceCollide<D3Node>((d) => nodeRadius(d) + 6))
-    .force("x", forceX(width / 2).strength(0.04))
-    .force("y", forceY(height / 2).strength(0.04));
+    // Bigger collision radius prevents node overlap
+    .force("collide", forceCollide<D3Node>((d) => nodeRadius(d) + 18))
+    // Weaker centering pull so the layout uses the canvas
+    .force("x", forceX(width / 2).strength(0.02))
+    .force("y", forceY(height / 2).strength(0.02));
 
   simulation.on("tick", tick);
 
@@ -412,8 +394,12 @@ function renderJoin() {
   nodeEnter
     .append("circle")
     .attr("class", "node-fill")
-    .attr("fill", (d) => `url(#node-grad-${archIdx(d.archetype)})`)
-    .attr("stroke", "rgba(255,255,255,0.85)")
+    // Flat fill = the resolved archetype color. We dropped the
+    // hash-indexed radial gradient because it could pick a different
+    // hue from the stroke + glow, which made every node look like its
+    // own thing instead of grouping by persona type.
+    .attr("fill", (d) => nodeColor(d))
+    .attr("stroke", "rgba(255,255,255,0.9)")
     .attr("stroke-width", 1.5)
     .attr("r", 0);
 
@@ -491,7 +477,7 @@ function tick() {
   // Nodes
   const nodeSel = root.select(".nodes").selectAll<SVGGElement, D3Node>("g.node");
   nodeSel.attr("transform", (d) => `translate(${d.x ?? 0},${d.y ?? 0})`);
-  nodeSel.attr("opacity", (d) => (dimmedIds.value.has(d.id) ? 0.22 : 1));
+  nodeSel.attr("opacity", (d) => (dimmedIds.value.has(d.id) ? 0.45 : 1));
   nodeSel
     .select<SVGCircleElement>("circle.node-fill")
     .attr("r", (d) => nodeRadius(d) * (selectedId.value === d.id ? 1.18 : 1))
@@ -668,16 +654,16 @@ watch(() => [props.agents, props.edges], () => updateGraph(), { deep: true });
 
 <script lang="ts">
 const archetypeColors = [
-  "#22d3ee",
-  "#a78bfa",
-  "#f97316",
-  "#22c55e",
-  "#fbbf24",
-  "#84cc16",
-  "#38bdf8",
-  "#ec4899",
-  "#60a5fa",
-  "#94a3b8",
+  "#2dd4bf",  // tech (teal)
+  "#c084fc",  // politician (lavender)
+  "#fb923c",  // media (coral)
+  "#4ade80",  // activist (mint)
+  "#facc15",  // business (amber)
+  "#a3e635",  // developer (lime)
+  "#7dd3fc",  // researcher (sky)
+  "#f472b6",  // community (rose)
+  "#818cf8",  // platform (indigo)
+  "#cbd5e1",  // person (slate)
 ];
 function lighten(hex: string, pct: number): string {
   const c = hex.replace("#", "");
