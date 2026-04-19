@@ -203,6 +203,12 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
           "READY",
           "SIMULATING",
           "COMPLETED",
+          // Show whatever was generated even if the sim died, so the
+          // user sees the partial graph + action log instead of an
+          // empty pane with just an error banner.
+          "INTERRUPTED",
+          "FAILED",
+          "CANCELLED",
         ];
         if (phasesNeedingHydrate.includes(snap.state)) {
           hydrateAgents(simId);
@@ -240,6 +246,9 @@ export function useSimulationEvents(simIdRef: Ref<string>) {
         "READY",
         "SIMULATING",
         "COMPLETED",
+        "INTERRUPTED",
+        "FAILED",
+        "CANCELLED",
       ];
       if (hydratablePhases.includes(snap.state)) {
         await hydrateAgents(simId);
