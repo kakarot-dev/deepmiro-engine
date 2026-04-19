@@ -433,15 +433,76 @@ function fuseEntityWithPersonas(
     }
   }
 
-  // Real semantic edges from the knowledge graph
+  // Real semantic edges from the knowledge graph (primary layer)
   const edges: GraphEdge[] = [];
+  const incident = new Set<number>();
   for (const ed of eg.edges) {
     const s = idByUuid.get(ed.source_node_uuid);
     const t = idByUuid.get(ed.target_node_uuid);
     if (s == null || t == null || s === t) continue;
     const label = ed.name?.trim() || ed.fact?.trim() || "related";
     edges.push({ source: s, target: t, type: "fact", label });
+    incident.add(s);
+    incident.add(t);
   }
+
+  // Archetype cluster edges (secondary layer) — keep every node
+  // connected to at least one neighbor in its archetype group, even
+  // when the LLM's entity graph leaves it as a self-loop or orphan
+  // (ByteDance is the canonical example: only --AFFILIATED_WITH-->
+  // ByteDance was generated, so without this fallback ByteDance
+  // floats alone).
+  const archIdx = new Map<string, number[]>();
+  for (const n of nodes) {
+    const a = resolveArchetype(n.archetype).label;
+    if (!archIdx.has(a)) archIdx.set(a, []);
+    archIdx.get(a)!.push(n.id);
+  }
+  for (const [archetype, ids] of archIdx) {
+    if (ids.length < 2) continue;
+    // Chain within the archetype group so the force-layout clusters
+    // them. Dedup against existing fact edges to avoid double lines.
+    const factPairs = new Set(edges.map((e) => `${e.source}-${e.target}`));
+    for (let i = 0; i < ids.length - 1; i++) {
+      const s = ids[i], t = ids[i + 1];
+      if (factPairs.has(`${s}-${t}`) || factPairs.has(`${t}-${s}`)) continue;
+      edges.push({
+        source: s,
+        target: t,
+        type: "cluster",
+        label: `Both: ${archetype}`,
+      });
+      incident.add(s);
+      incident.add(t);
+    }
+  }
+
+  // Last-resort tether: any node still incident to nothing gets a
+  // bridge edge to the most-connected node so it doesn't float off.
+  if (nodes.length > 1) {
+    const orphans = nodes.filter((n) => !incident.has(n.id));
+    if (orphans.length) {
+      const degree = new Map<number, number>();
+      for (const e of edges) {
+        degree.set(e.source as number, (degree.get(e.source as number) ?? 0) + 1);
+        degree.set(e.target as number, (degree.get(e.target as number) ?? 0) + 1);
+      }
+      const anchor = nodes
+        .filter((n) => !orphans.includes(n))
+        .sort((a, b) => (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0))[0];
+      if (anchor) {
+        for (const orphan of orphans) {
+          edges.push({
+            source: orphan.id,
+            target: anchor.id,
+            type: "bridge",
+            label: "isolated",
+          });
+        }
+      }
+    }
+  }
+
   return { nodes, edges };
 }
 
