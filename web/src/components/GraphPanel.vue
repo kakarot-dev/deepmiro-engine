@@ -33,6 +33,7 @@ import "d3-transition";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { GraphEdge, GraphNode } from "@/types/api";
 import { resolveArchetype } from "@/lib/archetypes";
+import { personaColor } from "@/lib/colors";
 import { truncate } from "@/lib/format";
 
 interface Props {
@@ -132,9 +133,13 @@ function nodeRadius(n: D3Node): number {
   if (isHub(n)) return 22; // larger central anchor
   return Math.min(28, 10 + Math.sqrt(Math.max(0, n.post_count)) * 2.4);
 }
+/**
+ * Per-node color: shared with avatars / cards / sheets via personaColor()
+ * so the same persona reads as the same person across the whole app.
+ */
 function nodeColor(n: D3Node): string {
-  if (isHub(n)) return "#22d3ee"; // primary cyan
-  return resolveArchetype(n.archetype).color;
+  if (isHub(n)) return "#22d3ee";
+  return personaColor(n.name);
 }
 const INTERACTION_COLORS: Record<string, string> = {
   "interaction:like": "#facc15",     // amber

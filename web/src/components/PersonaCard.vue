@@ -4,6 +4,7 @@ import Card from "@/components/ui/Card.vue";
 import Avatar from "@/components/ui/Avatar.vue";
 import Badge from "@/components/ui/Badge.vue";
 import { resolveArchetype } from "@/lib/archetypes";
+import { personaColor } from "@/lib/colors";
 import type { AgentProfile } from "@/types/api";
 
 interface Props {
@@ -26,7 +27,7 @@ export default { inheritAttrs: false };
 <template>
   <Card hoverable v-bind="$attrs" class="persona-card-clickable">
     <div class="head">
-      <Avatar :name="name" :color="archetype.color" :size="40" />
+      <Avatar :name="name" :color="personaColor(name)" :size="40" />
       <div class="ident">
         <div class="name">{{ name }}</div>
         <div v-if="handle" class="handle">@{{ handle }}</div>

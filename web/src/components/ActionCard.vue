@@ -4,6 +4,7 @@ import { Heart, MessageCircle, Repeat2, ArrowUpFromLine, ArrowBigUp, Quote } fro
 import Avatar from "@/components/ui/Avatar.vue";
 import Badge from "@/components/ui/Badge.vue";
 import { resolveArchetype } from "@/lib/archetypes";
+import { personaColor } from "@/lib/colors";
 import type { AgentActionRecord, GraphNode } from "@/types/api";
 
 interface Props {
@@ -86,7 +87,7 @@ function timeAgo(): string {
 
 <template>
   <div class="action-card" :class="platform">
-    <Avatar :name="name" :color="archetype.color" :size="40" />
+    <Avatar :name="name" :color="personaColor(name)" :size="40" />
     <div class="body">
       <div class="header">
         <span class="name">{{ name }}</span>

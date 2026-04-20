@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { AlertTriangle, RefreshCw } from "lucide-vue-next";
-import Button from "@/components/ui/Button.vue";
 import SimulatingView from "@/components/phases/SimulatingView.vue";
 import type { AgentActionRecord, GraphEdge, GraphNode, SimSnapshot, SimState } from "@/types/api";
 
@@ -25,32 +23,13 @@ const emit = defineEmits<{
   "select-agent": [agent: GraphNode | null];
   "select-edge": [edge: GraphEdge | null];
 }>();
-
-const titles: Record<string, string> = {
-  FAILED: "Simulation failed",
-  CANCELLED: "Simulation cancelled",
-  INTERRUPTED: "Simulation interrupted",
-};
 </script>
 
 <template>
   <div class="layout">
-    <div class="banner">
-      <div class="banner-left">
-        <AlertTriangle :size="20" />
-        <div class="banner-text">
-          <strong>{{ titles[state] || "Simulation ended early" }}</strong>
-          <span v-if="error">{{ error }}</span>
-          <span v-else>Partial results below — start a fresh run to continue.</span>
-        </div>
-      </div>
-      <router-link to="/">
-        <Button variant="primary">
-          <RefreshCw :size="14" />
-          New prediction
-        </Button>
-      </router-link>
-    </div>
+    <!-- The interrupted banner is rendered by SimulationRunView at the
+         top of every step, so it's not duplicated here. TerminalView's
+         job is just to render the data feed + graph. -->
     <div class="feed-wrap">
       <SimulatingView
         :actions="actions"

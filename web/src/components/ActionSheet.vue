@@ -4,6 +4,7 @@ import Sheet from "@/components/ui/Sheet.vue";
 import Avatar from "@/components/ui/Avatar.vue";
 import Badge from "@/components/ui/Badge.vue";
 import { resolveArchetype } from "@/lib/archetypes";
+import { personaColor } from "@/lib/colors";
 import type { AgentActionRecord, GraphNode } from "@/types/api";
 
 interface Props {
@@ -49,7 +50,7 @@ const otherArgs = computed(() => {
   >
     <div v-if="action" class="sheet-content">
       <div class="head">
-        <Avatar v-if="actor" :name="actor.name" :color="archetype.color" :size="48" />
+        <Avatar v-if="actor" :name="actor.name" :color="personaColor(actor.name)" :size="48" />
         <div class="head-text">
           <div class="line">
             <span class="name">{{ actor?.name ?? action.agent_name ?? `Agent ${action.agent_id}` }}</span>

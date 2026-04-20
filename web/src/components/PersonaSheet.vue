@@ -4,6 +4,7 @@ import Sheet from "@/components/ui/Sheet.vue";
 import Avatar from "@/components/ui/Avatar.vue";
 import Badge from "@/components/ui/Badge.vue";
 import { resolveArchetype } from "@/lib/archetypes";
+import { personaColor } from "@/lib/colors";
 import type { AgentActionRecord, AgentProfile, GraphNode } from "@/types/api";
 import type { ScenarioContext } from "@/api/simulation";
 
@@ -110,7 +111,7 @@ const postCount = computed(() =>
     </div>
     <div v-else-if="agent || profile" class="sheet-content">
       <div class="head">
-        <Avatar :name="name" :color="archetype.color" :size="56" />
+        <Avatar :name="name" :color="personaColor(name)" :size="56" />
         <div class="head-text">
           <div class="name">{{ name }}</div>
           <div v-if="handle" class="handle">@{{ handle }}</div>

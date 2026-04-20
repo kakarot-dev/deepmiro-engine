@@ -4,6 +4,7 @@ import Sheet from "@/components/ui/Sheet.vue";
 import Avatar from "@/components/ui/Avatar.vue";
 import Badge from "@/components/ui/Badge.vue";
 import { resolveArchetype } from "@/lib/archetypes";
+import { personaColor } from "@/lib/colors";
 import type { AgentActionRecord, GraphEdge, GraphNode } from "@/types/api";
 import type { ScenarioContext } from "@/api/simulation";
 
@@ -132,7 +133,7 @@ const desc = computed(() => sectionDescriptions[kind.value]);
       <div v-if="kind !== 'cluster'" class="endpoints">
         <div class="endpoint">
           <div v-if="source && source.archetype === 'Scenario'" class="hub-mini">★</div>
-          <Avatar v-else-if="source" :name="source.name" :color="sourceColor" :size="44" />
+          <Avatar v-else-if="source" :name="source.name" :color="personaColor(source.name)" :size="44" />
           <div class="endpoint-text">
             <div class="endpoint-name">{{ source?.name ?? "—" }}</div>
             <div v-if="source && source.archetype !== 'Scenario'" class="endpoint-arch">{{ resolveArchetype(source.archetype).label }}</div>
@@ -146,7 +147,7 @@ const desc = computed(() => sectionDescriptions[kind.value]);
         </div>
         <div class="endpoint">
           <div v-if="target && target.archetype === 'Scenario'" class="hub-mini">★</div>
-          <Avatar v-else-if="target" :name="target.name" :color="targetColor" :size="44" />
+          <Avatar v-else-if="target" :name="target.name" :color="personaColor(target.name)" :size="44" />
           <div class="endpoint-text">
             <div class="endpoint-name">{{ target?.name ?? "—" }}</div>
             <div v-if="target && target.archetype !== 'Scenario'" class="endpoint-arch">{{ resolveArchetype(target.archetype).label }}</div>
@@ -168,7 +169,7 @@ const desc = computed(() => sectionDescriptions[kind.value]);
         <div class="section-title">All nodes in this cluster ({{ clusterMembers.length }})</div>
         <div class="member-list">
           <div v-for="m in clusterMembers" :key="m.id" class="member">
-            <Avatar :name="m.name" :color="resolveArchetype(m.archetype).color" :size="28" />
+            <Avatar :name="m.name" :color="personaColor(m.name)" :size="28" />
             <span>{{ m.name }}</span>
           </div>
         </div>

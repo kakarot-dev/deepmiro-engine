@@ -1,10 +1,12 @@
 <script setup lang="ts">
 /**
  * SimulatingView — universal layout. Graph stays primary on the left;
- * the right rail is the live action feed with platform tabs and
- * clickable cards (each opens an ActionSheet).
+ * the right rail is the live action feed. Twitter and Reddit both
+ * have their own visible columns inside the rail (vertically stacked
+ * 50/50) so users can see activity on both platforms at a glance.
  */
 import { computed, ref, watch, nextTick } from "vue";
+import { Twitter, MessagesSquare } from "lucide-vue-next";
 import UniversalStepLayout from "@/components/UniversalStepLayout.vue";
 import GraphPanel from "@/components/GraphPanel.vue";
 import GraphBuildingView from "@/components/phases/GraphBuildingView.vue";
@@ -31,27 +33,28 @@ const emit = defineEmits<{
   "select-edge": [edge: GraphEdge | null];
 }>();
 
-type Filter = "all" | "twitter" | "reddit";
-const filter = ref<Filter>("all");
-const feedRef = ref<HTMLDivElement | null>(null);
+const twitterRef = ref<HTMLDivElement | null>(null);
+const redditRef = ref<HTMLDivElement | null>(null);
 
 const agentMap = computed(() => {
   const m = new Map<number, GraphNode>();
   for (const a of props.agents) m.set(a.id, a);
   return m;
 });
-const filtered = computed(() => {
-  let list = props.actions;
-  if (filter.value !== "all") {
-    list = list.filter((a) => a.platform === filter.value);
-  }
-  return list.slice(0, 100);
-});
+const twitterActions = computed(() =>
+  props.actions.filter((a) => a.platform === "twitter").slice(0, 60),
+);
+const redditActions = computed(() =>
+  props.actions.filter((a) => a.platform === "reddit").slice(0, 60),
+);
 
-// Auto-scroll to top when a new action arrives (newest first)
-watch(() => props.actions.length, async () => {
+watch(twitterActions, async () => {
   await nextTick();
-  feedRef.value?.scrollTo({ top: 0, behavior: "smooth" });
+  twitterRef.value?.scrollTo({ top: 0, behavior: "smooth" });
+});
+watch(redditActions, async () => {
+  await nextTick();
+  redditRef.value?.scrollTo({ top: 0, behavior: "smooth" });
 });
 </script>
 
@@ -68,36 +71,56 @@ watch(() => props.actions.length, async () => {
       @select-edge="(e) => emit('select-edge', e)"
     />
     <template #rail>
-      <div class="rail-head">
-        <div class="rail-title">Live activity</div>
-        <div class="filter">
-          <button
-            v-for="opt in (['all', 'twitter', 'reddit'] as Filter[])"
-            :key="opt"
-            class="filter-btn"
-            :class="{ active: filter === opt }"
-            @click="filter = opt"
-          >
-            {{ opt }}
-            <span v-if="opt === 'twitter'" class="dim">{{ twitterCount }}</span>
-            <span v-else-if="opt === 'reddit'" class="dim">{{ redditCount }}</span>
-            <span v-else class="dim">{{ twitterCount + redditCount }}</span>
-          </button>
+      <div class="rail-stack">
+        <!-- Twitter -->
+        <div class="feed-section">
+          <div class="feed-head">
+            <div class="title">
+              <Twitter :size="13" />
+              <span>Twitter</span>
+            </div>
+            <span class="count">{{ twitterCount }}</span>
+          </div>
+          <div class="feed" ref="twitterRef">
+            <TransitionGroup name="action">
+              <ActionCard
+                v-for="a in twitterActions"
+                :key="a.timestamp + '_' + a.agent_id + '_' + a.action_type"
+                :action="a"
+                :agent="agentMap.get(a.agent_id)"
+                class="clickable"
+                @click="emit('select-action', a)"
+              />
+            </TransitionGroup>
+            <div v-if="twitterActions.length === 0" class="empty">
+              No twitter activity yet.
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="feed" ref="feedRef">
-        <TransitionGroup name="action">
-          <ActionCard
-            v-for="a in filtered"
-            :key="a.timestamp + '_' + a.agent_id + '_' + a.action_type"
-            :action="a"
-            :agent="agentMap.get(a.agent_id)"
-            class="clickable"
-            @click="emit('select-action', a)"
-          />
-        </TransitionGroup>
-        <div v-if="filtered.length === 0" class="empty">
-          No actions yet.
+        <!-- Reddit -->
+        <div class="feed-section">
+          <div class="feed-head">
+            <div class="title">
+              <MessagesSquare :size="13" />
+              <span>Reddit</span>
+            </div>
+            <span class="count">{{ redditCount }}</span>
+          </div>
+          <div class="feed" ref="redditRef">
+            <TransitionGroup name="action">
+              <ActionCard
+                v-for="a in redditActions"
+                :key="a.timestamp + '_' + a.agent_id + '_' + a.action_type"
+                :action="a"
+                :agent="agentMap.get(a.agent_id)"
+                class="clickable"
+                @click="emit('select-action', a)"
+              />
+            </TransitionGroup>
+            <div v-if="redditActions.length === 0" class="empty">
+              No reddit activity yet.
+            </div>
+          </div>
         </div>
       </div>
     </template>
@@ -105,56 +128,56 @@ watch(() => props.actions.length, async () => {
 </template>
 
 <style scoped>
-.rail-head {
-  padding: var(--gap-sm) var(--gap-md);
-  border-bottom: 1px solid var(--border);
+.rail-stack {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  height: 100%;
+  min-height: 0;
+}
+.feed-section {
   display: flex;
   flex-direction: column;
-  gap: var(--gap-sm);
+  min-height: 0;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
 }
-.rail-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--fg-strong);
+.feed-section:last-child { border-bottom: none; }
+.feed-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px var(--gap-md);
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
-.filter { display: flex; gap: 4px; }
-.filter-btn {
-  flex: 1;
+.title {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 6px;
-  padding: 6px 10px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--fg-muted);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-strong);
+  letter-spacing: 0.02em;
+}
+.count {
   font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  text-transform: capitalize;
-  transition: all var(--duration-fast) var(--ease-out);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
 }
-.filter-btn:hover { color: var(--fg); border-color: var(--border-strong); }
-.filter-btn.active {
-  background: color-mix(in srgb, var(--primary) 14%, transparent);
-  color: var(--primary);
-  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
-}
-.dim { color: var(--fg-subtle); font-variant-numeric: tabular-nums; }
 .feed {
   flex: 1;
   overflow-y: auto;
-  padding: var(--gap-md);
+  padding: var(--gap-sm);
   display: flex;
   flex-direction: column;
-  gap: var(--gap-sm);
+  gap: 6px;
   scroll-behavior: smooth;
 }
 .empty {
-  padding: var(--gap-lg);
+  padding: var(--gap-md);
   text-align: center;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--fg-subtle);
 }
 .clickable { cursor: pointer; }
